@@ -1,0 +1,3 @@
+*.log
+recon-*.log
+.DS_Store
