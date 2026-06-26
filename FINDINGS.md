@@ -45,6 +45,21 @@
 
 > Blocage matériel : **aucun** (APQ8098 = Android-native). Blocage = chaîne de boot signée. Chemin = EDL/Sahara + teardown pour test points/UART.
 
+### ⚠️ Analyse protocole EDL — le verrou se réduit à UN artefact
+Après lecture Aleph Security + bkerler/edl loader management :
+- **Firehose signé obligatoire** : bkerler matche le loader par **hardware-ID + hash de clé publique**. Secure Boot actif (cas opérateur quasi certain) ⇒ il faut le firehose **signé par Free pour ce board précis**. Pas de loader générique MSM8998 si secure boot ON.
+- **Peek/Poke EL3** ([ALEPH-2017028](https://alephsecurity.com/vulns/aleph-2017028)) = bypass complet Secure Boot (dump PBL, défait chain of trust) **mais POST-auth** : nécessite un firehose **déjà en exécution**.
+- **PBL extraction sans loader signé** (niveau Sahara) : démontré seulement sur MSM8994/8937/8953/8974 — **PAS le MSM8998**. Donc EDL seul ≠ bypass sur APQ8098.
+
+**→ Tout le projet se ramène à : obtenir le firehose Free signé du Player Devialet.**
+Avec lui : peek/poke → EL3 → contrôle total (dump eMMC, patch aboot, flash Android). Sans lui : EDL inerte.
+
+### Pistes pour récupérer le firehose Free (légales)
+- [ ] Chercher une **image OTA / firmware Player Devialet** publiée par Free (le `prog_firehose_*.elf` est parfois embarqué dans les outils d'usine, rarement dans l'OTA).
+- [ ] **Dump eMMC hors EDL** : ISP/chip-off de l'eMMC, ou shell via UART → `dd` des partitions. Bypasse le besoin de firehose (lecture directe du flash).
+- [ ] Vérifier si un firehose MSM8998 d'un **autre device** passe (peu probable si Secure Boot, mais à tester : certains boards ont QFuse non blown en prod).
+- [ ] **UART en priorité** : si un shell root est accessible au boot, on lit le firmware directement et on saute toute la problématique EDL.
+
 ## Ports ouverts (TCP)
 | Port | Service | Bannière / version | Notes |
 |-|-|-|-|
