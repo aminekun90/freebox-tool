@@ -22,7 +22,10 @@
 ### Implication Android
 - L'APQ8098 = même puce que Pixel 2 / OnePlus 5 / Galaxy S8 → **fait tourner Android nativement**. Aucune limite matérielle.
 - Verrou réel = **logiciel/crypto** : bootloader Qualcomm verrouillé (Secure Boot / QFuse), firmware signé, aucune ROM AOSP/Lineage existante pour ce board (port complet à faire : kernel + device tree + drivers Devialet/HDMI).
-- Référence : demande officielle Android TV sur Player Devialet [FS#33524](https://dev.freebox.fr/bugs/task/33524) — sans suite. Free n'a Android TV que sur Pop (Amlogic S905X2) et V9.
+- Références bug tracker Free (toutes refusées) :
+  - [FS#33524](https://dev.freebox.fr/bugs/task/33524) — « Player delta Devialet sous Android TV », sans suite.
+  - [FS#34632](https://dev.freebox.fr/bugs/task/34632) — « Passer la Freebox Devialet à Android TV ou Google TV ». **Clos « Ne sera pas implémenté »** (Thibaut, 2021-05-04). Les users notent le hardware *capable* d'Android TV + ~7 bugs ouverts depuis 2018 (Disney+, Netflix 5.1, Chromecast non fonctionnel).
+  - → Aucune voie officielle ne viendra. Le jailbreak communautaire est la **seule** option. Free n'a Android TV que sur Pop (Amlogic S905X2) et V9.
 
 ### Pistes hardware d'entrée (toutes légales sur matériel possédé)
 - [ ] **EDL mode / Qualcomm 9008** (USB) — point d'entrée classique SD835. Besoin d'un *firehose programmer* signé pour ce board (souvent extrait par device). Permet dump/flash eMMC.

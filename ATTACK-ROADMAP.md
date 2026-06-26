@@ -11,6 +11,7 @@
 
 - **Hardware 100 % capable** : SoC **Qualcomm APQ8098** (= MSM8998 / Snapdragon 835 sans modem), 2 Go RAM, 32 Go eMMC. Même puce que Pixel 2 / OnePlus 5 / Galaxy S8 → Android tourne nativement.
 - **Verrou = chaîne de boot signée**, pas le matériel. Secure Boot Qualcomm + firmware Free signé.
+- **Aucune voie officielle** : Free a refusé Android TV sur ce Player ([FS#33524](https://dev.freebox.fr/bugs/task/33524), [FS#34632](https://dev.freebox.fr/bugs/task/34632) clos « ne sera pas implémenté »). Le jailbreak communautaire est la seule option.
 - **Le projet se ramène à UN artefact** : le **firehose programmer signé par Free** pour ce board. Avec lui, l'exploit peek/poke d'Aleph donne EL3 → contrôle total. Sans lui, l'EDL est inerte sur MSM8998.
 
 ## Pourquoi l'EDL seul ne suffit pas (sur ce SoC)
