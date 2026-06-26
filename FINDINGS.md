@@ -161,6 +161,11 @@ Le sandbox QML **n'expose aucune primitive** fichier/exec/IPC privilégiée. `fi
 - `Application.contents` = simple liste des enfants UI.
 - **Sandbox réseau + FS hermétique.** Code execution réelle mais confinée.
 
+### Mécanisme de dispatch d'URL (`handleUrl` / `openUrlExternally`)
+- L'app peut déclarer `function handleUrl(url)` → le **système lui envoie des actions**. Au lancement : reçoit **`"run"`**.
+- `Qt.openUrlExternally(url)` renvoie `true` pour toute URL (`http`, `file://`, `fbx://`, schémas custom) **mais sans effet observable** (aucun navigateur système, notre serveur ne reçoit rien). Pas d'évasion directe constatée.
+- Piste ouverte : **vocabulaire des schémas `fbx://`** (verbes privilégiés : install/launch/settings ?) — non documenté, effets non observables côté app. À fuzzer si on trouve un canal de retour.
+
 ### Pistes d'escalade restantes (Phase 3 — recherche)
 - [ ] **`fbx.web`** : composant WebView/navigateur embarqué ? → surface browser (file://, bridge JS, exploits moteur web). À introspecter.
 - [ ] **Plugin natif via `importPaths`** : le `.fbxproject` mentionne `importPaths`. Charger un plugin QML compilé (.so aarch64) servi par nous ? (probablement restreint aux chemins locaux).
