@@ -23,65 +23,71 @@ Ne contribuez avec des résultats que sur **votre propre** Player Delta.
 ```
 freebox-tool/
 ├── README.md           # ce fichier — contexte & onboarding
-├── FINDINGS.md         # journal des découvertes (ports, services, mDNS, hardware, EDL)
-├── ATTACK-ROADMAP.md   # 🎯 plan d'attaque bootloader/EDL pour contributeurs
+├── FINDINGS.md         # journal des découvertes (réseau, hardware, mode dev, sandbox)
+├── PLAN.md             # plan d'exécution code-execution → sondage sandbox → escalade
+├── ATTACK-ROADMAP.md   # voie hardware/EDL/bootloader (plan B)
+├── app/
+│   └── probe/          # app QML de sondage du sandbox (manifest.json + Main.qml)
 └── scripts/
-    └── recon.sh        # scan réseau non destructif (nmap + mDNS + SSDP + sonde ADB)
+    ├── fbx-deploy.py   # ⭐ déploie/exécute une app QML sur le Player (mode dev)
+    └── recon.sh        # scan réseau non destructif (nmap + mDNS + SSDP)
 ```
 
-> **Tu veux contribuer au jailbreak ?** Lis [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md) :
-> la voie réseau est un cul-de-sac, le chemin réaliste passe par l'EDL/bootloader
-> du SoC **Qualcomm APQ8098**. Tâches concrètes par niveau d'effort.
+## 🔥 État actuel — CODE EXECUTION obtenue (2026-06-26)
 
-## 🔎 État actuel (2026-06-26)
-
-Premier scan réseau effectué sur un Player Delta réel (détails dans `FINDINGS.md`) :
+**Percée** : le Player a un **mode développeur officiel** (réglages → système) qui
+active un endpoint **JSON-RPC `http://<player>/pub/devel`**. Protocole reversé depuis
+le plugin LGPL `freebox-qtcreator-plugin` et réimplémenté dans **`scripts/fbx-deploy.py`**
+(Python pur, sans QtCreator) : on sert un manifest+QML en HTTP local, le Player **fetch
+l'app, l'exécute, et streame stdout/stderr**.
 
 | Constat | Détail |
 |-|-|
-| Vendor MAC | `FREEBOX SAS` (`34:27:92:…`) |
-| Ports ouverts | 80/8080 (nginx), 554 (`Freebox rtspd 1.2`), 5000+7000 (AirPlay/RAOP) |
-| ADB 5555 | **fermé** |
-| SSH / telnet | absents |
-| AirPlay | `srcvers 220.68`, **`pw=false`** → streaming audio ouvert (enceinte OK) |
-| OS sous-jacent | **Linux** probable (nginx + rtspd + récepteur RAOP soft), pas Android exposé |
+| SoC | **Qualcomm APQ8098** (Snapdragon 835), 2 Go RAM, 32 Go UFS |
+| OS | Linux (`linux-fbx7hd`), runtime QML `fbxqmltv` |
+| Modèle / firmware | **`fbx7hd-delta`** / **`1.5.24.2`** (lu via `fbx.system/Device`) |
+| Surface réseau | 80/8080 (nginx), 554 (rtspd), 5000+7000 (AirPlay) ; ADB/SSH fermés |
+| **Mode dev** | `/pub/devel` JSON-RPC `debug_qml_app` → **exécution d'apps QML** ✅ |
+| Sandbox | **hermétique** : `file://` bloqué, pas d'exec, XHR limité à l'origine, modules privilégiés réservés aux apps signées |
 
-**Conclusion provisoire :** appliance Linux verrouillée, surface réseau minimale.
-La voie « Android par le réseau » est étroite. Pistes encore ouvertes ci-dessous.
+**Conclusion** : on exécute du code (QML/JS) sur le Player, mais confiné. L'évasion vers
+root demande un cran de plus (exploit moteur Qt, module restreint, ou voie hardware).
 
 ## 🎯 Objectifs (du plus simple au plus ambitieux)
 
-1. **Cartographier la surface d'attaque** : ports, services, bannières, mDNS/UPnP.
-2. **Trouver un point d'entrée logiciel** : ADB, shell, web/dev caché, API Free/Devialet.
-3. **Activer un mode développeur** sans flash (debug, services cachés).
-4. **Obtenir un shell**.
-5. **Stretch** : booter un OS custom / Android, OU exposer proprement l'audio.
+1. ~~Cartographier la surface d'attaque~~ ✅
+2. ~~Trouver un point d'entrée logiciel~~ ✅ (mode dev `/pub/devel`)
+3. ~~Activer un mode développeur sans flash~~ ✅
+4. **Évader le sandbox QML** → exécution non confinée / shell (en cours).
+5. **Stretch** : booter un OS custom / Android.
 
-## 🧩 Pistes recherchées (où contribuer)
+## 🧩 Pistes d'évasion recherchées (où contribuer)
 
-- [ ] **Fuzzing chemins nginx** (80/8080) — l'UI Free vit peut-être sur un vhost / `Host` header (`mafreebox.freebox.fr`).
-- [ ] **RTSP `Freebox rtspd 1.2`** (554) — surface custom Free, parsing à analyser.
-- [ ] **RAOP `srcvers 220.68`** — chercher CVE/exploits sur récepteurs AirPlay legacy.
-- [ ] **Console série / UART** sur la carte — repli matériel si le réseau est un cul-de-sac.
-- [ ] **Dumps firmware** / analyse du SoC (modèle, bootloader, signature).
+- [ ] **Exploit du moteur Qt/QML** (5.8) — corruption mémoire depuis QML/JS arbitraire → code natif.
+- [ ] **Plugin natif via `importPaths`** — charger un `.so` aarch64 (probablement restreint au local).
+- [ ] **Client du QML debugger** (`qml_port` renvoyé par `debug_qml_app`) — REPL JS live sur le device.
+- [ ] **Voie hardware** : UART (`TP5/TP6/TP7`) / EDL — cf. [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md).
+- [ ] **Dump firmware** `1.5.24.2` (capture OTA transparente) → reverse hors-ligne.
 
 ## 🚀 Reproduire / contribuer
 
-Pré-requis (macOS) : `nmap`, `adb`, `nc`, `dns-sd`.
+Pré-requis : `python3`, `nmap`, `dns-sd`. **Active le mode développeur** sur ton Player
+(réglages → système) — c'est ce qui ouvre `/pub/devel`.
 
 ```bash
 git clone git@github.com:aminekun90/freebox-tool.git
 cd freebox-tool
 
-# 1) Trouver l'IP de TON player (Freebox OS → DHCP/Appareils, ou ping sweep)
-./scripts/recon.sh 192.168.1.0/24
+# Déploie l'app de sondage sur TON Player (détecté par MAC, ou --player <ip>)
+python3 scripts/fbx-deploy.py app/probe
 
-# 2) Scan complet d'une cible que tu possèdes
+# Recon réseau (optionnel)
 ./scripts/recon.sh 192.168.1.0/24 <player-ip>
 ```
 
-Le scan écrit un log `recon-<ip>-<date>.log`. Reportez les résultats notables
-dans `FINDINGS.md` puis ouvrez une **PR** ou une **issue**.
+`fbx-deploy.py` sert l'app en HTTP local, appelle `debug_qml_app`, et affiche le
+`stdout`/`stderr` de l'app exécutée sur le Player. Reportez vos résultats dans
+`FINDINGS.md` puis ouvrez une **PR**.
 
 ### Conventions
 
@@ -93,8 +99,8 @@ dans `FINDINGS.md` puis ouvrez une **PR** ou une **issue**.
 ## ⚠️ Réalité connue (honnêteté d'entrée)
 
 - Aucune méthode publique vérifiée pour installer Android sur le Player Delta.
-- Le Player Delta tourne un **OS maison Free** (≠ Android TV du Player Pop).
-- **Le matériel n'est PAS le problème** : SoC APQ8098 = Snapdragon 835, Android-natif. Le verrou est la **chaîne de boot signée**.
-- La voie **services réseau** est désormais close (surface minimale, tout en 404).
-- Le chemin réaliste se ramène à **un seul artefact** : le firehose Free signé du board. Détails et tâches dans [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md).
+- Le Player Delta tourne un **OS maison Free** (Linux, runtime QML `fbxqmltv`), ≠ Android TV du Player Pop.
+- **Le matériel n'est PAS le problème** : APQ8098 = Snapdragon 835, Android-natif. Le verrou est **logiciel** (chaîne de boot signée + sandbox app).
+- **Acquis** : exécution de code QML/JS sur le Player via le mode dev officiel (`fbx-deploy.py`).
+- **Mur actuel** : le sandbox QML est hermétique ; l'évasion vers root reste à faire (exploit moteur, ou voie hardware UART/EDL — cf. [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md)).
 </content>
