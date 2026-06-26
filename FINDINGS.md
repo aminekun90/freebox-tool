@@ -146,11 +146,24 @@ Modèle (d'après `remote/remoteqml.cc`) : **on héberge l'app chez nous** (HTTP
   → `console*` (console de debug ?) et `accountId/profileId` (infos compte) = à sonder.
 - **Module QML absents** : `Qt.labs.folderlistmodel` non installé (Qt 5.8 minimal sur device).
 
-### Prochaines sondes
-- [ ] Lire `appState`, `consoleState`, `remoteMapping`, `contents` (ne PAS publier `accountId/profileId` = perso).
-- [ ] Énumérer les autres modules `fbx.*` (media/system/tv/input…) → APIs privilégiées exposées aux apps.
-- [ ] Tester capacités : `QProcess`/exec (probable absent en QML pur), sockets, écriture (`Settings`/`LocalStorage` → révèle chemin writable + uid).
-- [ ] Cibler une **API fbx exposant le système** (lecture conf, lancement d'app native, IPC) comme primitive d'évasion.
+### Carte du sandbox — RÉSULTATS (Phase 2 terminée)
+- **Identité device** (via singleton `fbx.system/Device`) : `model=fbx7hd-delta`, `firmwareVersion=1.5.24.2`, `hdcpVersion=22`, `is4k=true`.
+- **Chemin FS app** (leak via LocalStorage) : `/var/lib/databases/fbxqmltv/` — **non writable** par notre contexte. Runtime = `fbxqmltv`.
+- **`Application` (fbx.application)** props natives : `accountId` (vide), `profileId` (présent), `appState=2`, `consoleState=0`, `consoleWidget=null`, `remoteMapping="default"`.
+- **Modules chargeables en dev** (testés via `Qt.createQmlObject`) : `fbx.application`, `fbx.system`, `fbx.web`, `fbx.debug` (+ open-source : crypto/data/media/ui/hardware/async).
+- **Contenu des modules** (qmldir [libfbxqml](https://github.com/fbx/libfbxqml)) : **libs JS/QML utilitaires** (Http, JsonRpc, Oauth, Rest, FreeboxOS, Aes/Sha1, AudioPlayer/VideoPlayer, Pointer…). `fbx.system/Device` = lecture seule. `fbx.debug/Tree` = widget.
+- **Modules RESTREINTS** (doc) : `fbx.account`, `fbx.media`, `fbx.cdm` → exigent une **app signée/approuvée** (FreeStore). Non chargeables en dev simple.
+
+### Verdict Phase 2 : pas d'évasion via l'API standard
+Le sandbox QML **n'expose aucune primitive** fichier/exec/IPC privilégiée. `file://` bloqué, pas d'écriture, modules bénins.
+
+### Pistes d'escalade restantes (Phase 3 — recherche)
+- [ ] **`fbx.web`** : composant WebView/navigateur embarqué ? → surface browser (file://, bridge JS, exploits moteur web). À introspecter.
+- [ ] **Plugin natif via `importPaths`** : le `.fbxproject` mentionne `importPaths`. Charger un plugin QML compilé (.so aarch64) servi par nous ? (probablement restreint aux chemins locaux).
+- [ ] **Exploit du moteur Qt/QML** lui-même (corruption mémoire depuis QML/JS arbitraire) → code natif. Lourd.
+- [ ] **Module restreint** : voie légitime = soumettre une app signée (FreeStore) — peu réaliste pour du root.
+- [ ] **Pivot `fbx.web/FreeboxOS`** : API du Freebox Server (autre device) — hors scope Player.
+- [x] ~~file://, exec, écriture FS, modules privilégiés~~ → fermés en dev.
 - [ ] Installer QtCreator + plugin Freebox + lib QML `fbx`. Déployer une app test.
 - [ ] Sonder le **contexte d'exécution** de l'app : accès FS, lancement de process, code C++ natif autorisé ? user/uid ? → cartographier la surface d'évasion du sandbox.
 - [ ] Récupérer les **sources GPL** correspondant à `fbx7hd` (kernel/toolchain) → cross-compile.
