@@ -1,47 +1,50 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>fbx capability map</title></head>
+<head><meta charset="utf-8"><title>fbx webkit fingerprint</title></head>
 <body style="background:#101018;color:#3f6;font-family:monospace;font-size:18px">
-<h2>FBX browser capability map</h2>
+<h2>WebKit engine fingerprint</h2>
 <pre id="out">running…</pre>
 <script>
-// Cartographie des capacités du navigateur système — matériel possédé, documentation.
+// Feature-detection non destructif pour borner la version réelle du moteur WebKit.
+// Matériel possédé — documentation de surface d'attaque.
 var out = document.getElementById('out');
 function beacon(tag, val){
   try { var i = new Image();
-    i.src = "/REPORT?" + tag + "=" + encodeURIComponent(String(val).slice(0,200)) + "&t=" + Date.now();
+    i.src = "/REPORT?" + tag + "=" + encodeURIComponent(String(val)).slice(0,200) + "&t=" + Date.now();
   } catch(e){}
-  out.textContent += "\n" + tag + ": " + String(val).slice(0,90);
+  out.textContent += "\n" + tag + ": " + val;
 }
 
 beacon("ua", navigator.userAgent);
 
-// (1) Scan loopback : un fetch no-cors résolu = port ouvert, rejeté = fermé/filtré
-var ports = [80,443,3215,8080,8095,9091,9000,8000,8888,7000,5000,1234,
-             4000,8001,8009,8081,8082,3000,9999,11111,2323,8123,8090];
-function scan(port){
-  var url = "http://127.0.0.1:" + port + "/";
-  fetch(url, {mode:"no-cors", cache:"no-store"})
-    .then(function(){ beacon("loop_open", port); })
-    .catch(function(){ /* fermé : on ne spam pas */ });
-}
-for (var i=0;i<ports.length;i++) scan(ports[i]);
+// Marqueurs de version (Safari) :
+var feats = {
+  // présents dès ~15.4 → attendus si >= 16.0
+  structuredClone:   typeof structuredClone === "function",
+  findLast:          !!Array.prototype.findLast,
+  // introduits en 16.4 → ABSENTS si moteur figé à 16.0-16.3
+  toSorted:          !!Array.prototype.toSorted,
+  toSpliced:         !!Array.prototype.toSpliced,
+  arrayWith:         !!Array.prototype.with,
+  fromAsync:         typeof Array.fromAsync === "function",
+  reportError:       typeof reportError === "function",
+  offscreenCanvas:   typeof OffscreenCanvas === "function",
+  // ~17.0
+  regexpVflag:       (function(){ try { new RegExp("[\\p{L}]","v"); return true; } catch(e){ return false; } })(),
+  // primitives utiles à l'exploitation
+  wasm:              typeof WebAssembly === "object",
+  wasmInstance:      (function(){ try { return !!new WebAssembly.Module(new Uint8Array([0,97,115,109,1,0,0,0])); } catch(e){ return false; } })(),
+  sharedArrayBuffer: typeof SharedArrayBuffer === "function",
+  bigInt64Array:     typeof BigInt64Array === "function"
+};
+for (var k in feats) beacon("feat_" + k, feats[k]);
 
-// (2) Accès file:// depuis WebKit ?
-function fileTest(path){
-  try {
-    var x = new XMLHttpRequest();
-    x.onreadystatechange = function(){
-      if (x.readyState===4) beacon("file", path + " -> status=" + x.status + " len=" + (x.responseText||"").length);
-    };
-    x.open("GET", "file://" + path); x.send();
-  } catch(e){ beacon("file", path + " EXC " + e); }
-}
-fileTest("/etc/passwd");
-fileTest("/proc/version");
-
-// fin
-setTimeout(function(){ beacon("done", "1"); }, 4000);
+// Estimation de borne
+var v = "16.0-16.3";
+if (feats.toSorted || feats.fromAsync) v = ">=16.4";
+if (feats.regexpVflag) v = ">=17.0";
+beacon("engine_estimate", v);
+beacon("done", "1");
 </script>
 </body>
 </html>
