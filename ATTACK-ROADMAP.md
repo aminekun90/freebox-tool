@@ -57,6 +57,31 @@ On peut donc l'**intercepter sur son propre réseau** — seul moyen non-invasif
 - [ ] **Reverse de l'image** (`binwalk`/`unblob`) → partitions, bootloader, éventuel firehose, schéma de signature.
 
 > Script de capture fourni : `scripts/capture-ota.sh` (détecte le Player par MAC, trap de nettoyage). **Mais** sa version ARP-spoof déclenche le bip — à adapter pour une capture transparente.
+
+#### Runbook — capture transparente via Partage Internet macOS (à exécuter)
+Méthode validée comme la bonne (pas de spoof, pas de bip). Prérequis : **1 adaptateur USB-Ethernet**.
+
+Montage : `[Player] --Eth--> [USB-Eth] --> [Mac] --WiFi--> [Freebox → Internet]`
+
+1. Brancher l'adaptateur USB-Eth au Mac (Player **pas encore** branché).
+2. **Réglages Système → Partage → Partage Internet** :
+   - Partager depuis : **Wi-Fi**
+   - Aux ordinateurs via : **l'adaptateur USB-Ethernet** (iface type `en5`/`en6`)
+   - Activer **Partage Internet**.
+3. Brancher le **Player** sur l'adaptateur → le Mac est sa passerelle DHCP/NAT légitime.
+4. Identifier l'iface du Player (côté pont, souvent `bridge100` ou l'`enX` partagé) :
+   ```bash
+   ifconfig bridge100 2>/dev/null      # le Player apparaît dans le subnet 192.168.2.x
+   arp -an | grep -i 34:27:92:8e:f3:38  # confirmer son IP côté pont
+   ```
+5. Capturer (pas de sudo-spoof, juste tcpdump sur l'iface qui voit le Player) :
+   ```bash
+   sudo tcpdump -i bridge100 -nn -s0 -U -w ota-capture.pcap host <ip_player_cote_pont>
+   ```
+6. Pendant la capture : laisser le Player s'activer / power-cycle pour forcer le check OTA.
+7. Analyser : `tcpdump -r ota-capture.pcap -nn 'port 53'` (hostnames) puis `binwalk` sur toute image récupérée.
+
+Avantage bonus : le Mac voyant **tout** le trafic en clair au niveau IP, on peut aussi router vers **mitmproxy** (`mitmproxy --mode transparent`) pour inspecter le HTTP(S) non-pinné.
 - [ ] **Identifier le hardware-ID / MSM-ID exact** du board (utile pour matcher un firehose). Visible via Sahara hello en EDL, ou dans le firmware.
 - [ ] **Recenser les firehose MSM8998 publics** (autres devices SD835) et tester s'ils passent — improbable si QFuse blown, mais certains boards de prod ont le secure boot non verrouillé. Liste : [XDA firehose loaders](https://xdaforums.com/t/identifying-edl-firehose-loaders.4525079/).
 - [ ] **Veille CVE chaîne de boot MSM8998** : XBL/ABL/LK, anti-rollback, Sahara. Réévaluer [CVE-2021-1931](https://xdaforums.com/t/xz1c-xz1-xzp-xperable-xperia-abl-fastboot-exploit-cve-2021-1931.4771931/) (Sony-only aujourd'hui) si une surface fastboot apparaît.
