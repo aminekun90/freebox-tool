@@ -40,7 +40,15 @@ Obtenir un accès bas-niveau ?
 ## Tâches ouvertes (par coût croissant, toutes légales sur matériel possédé)
 
 ### Tier 0 — Pure recherche doc (aucun hardware requis)
-- [ ] **Localiser un firmware/OTA Free du Player Devialet.** Le `prog_firehose_*.elf` est rarement dans l'OTA (outil d'usine), mais vérifier : serveurs OTA Free, dumps communautaires, forums `lafibre.info`, `freebox.toosurtoo.com`, archives.
+- [x] ~~**Chercher un dump firmware public du Player.**~~ → **Inexistant.** Consensus communautaire ([forum univers­freebox](https://forum.universfreebox.com/viewtopic.php?t=78584)) : extraction infaisable sans JTAG. Pas de récupération USB ([FS#29071](https://dev.freebox.fr/bugs/task/29071), Free : « pas possible du tout »). Firmware **authentifié par MAC**, servi **par device enregistré** → pas téléchargeable librement.
+
+### Tier 0bis — Capture du canal OTA (sur SON propre Player, légal) ⭐ NOUVEAU VECTEUR PRIORITAIRE
+Puisque le firmware est servi **au Player** après auth MAC, le device le télécharge lui-même.
+On peut donc l'**intercepter sur son propre réseau** — c'est le seul moyen non-invasif d'obtenir le binaire.
+- [ ] **Sniffer le trafic de maj** du Player pendant un check/téléchargement de firmware (tcpdump/Wireshark sur le LAN, port mirroring ou ARP-MITM de SON device).
+- [ ] **Identifier l'URL/serveur OTA** et le **format du paquet** (chiffré ? signé ? `fbxupdate` ?). Déclencher une maj (versions récentes : 1.5.21 oct-2025, 1.5.24).
+- [ ] Si HTTPS avec pinning → tenter sur le port/handshake ; sinon capture directe de l'image.
+- [ ] **Reverse de l'image** (`binwalk`/`unblob`) → partitions, bootloader, éventuel firehose, schéma de signature.
 - [ ] **Identifier le hardware-ID / MSM-ID exact** du board (utile pour matcher un firehose). Visible via Sahara hello en EDL, ou dans le firmware.
 - [ ] **Recenser les firehose MSM8998 publics** (autres devices SD835) et tester s'ils passent — improbable si QFuse blown, mais certains boards de prod ont le secure boot non verrouillé. Liste : [XDA firehose loaders](https://xdaforums.com/t/identifying-edl-firehose-loaders.4525079/).
 - [ ] **Veille CVE chaîne de boot MSM8998** : XBL/ABL/LK, anti-rollback, Sahara. Réévaluer [CVE-2021-1931](https://xdaforums.com/t/xz1c-xz1-xzp-xperable-xperia-abl-fastboot-exploit-cve-2021-1931.4771931/) (Sony-only aujourd'hui) si une surface fastboot apparaît.

@@ -58,7 +58,8 @@ Après lecture Aleph Security + bkerler/edl loader management :
 Avec lui : peek/poke → EL3 → contrôle total (dump eMMC, patch aboot, flash Android). Sans lui : EDL inerte.
 
 ### Pistes pour récupérer le firehose Free (légales)
-- [ ] Chercher une **image OTA / firmware Player Devialet** publiée par Free (le `prog_firehose_*.elf` est parfois embarqué dans les outils d'usine, rarement dans l'OTA).
+- [x] ~~Chercher une image firmware **publiée**~~ → inexistante. Pas de dump public, pas de récup USB ([FS#29071](https://dev.freebox.fr/bugs/task/29071)), firmware auth par MAC + par device enregistré ([forum](https://forum.universfreebox.com/viewtopic.php?t=78584)).
+- [ ] **⭐ Capturer le canal OTA de SON Player** (MITM/sniff LAN) : le device télécharge l'image après auth MAC → interception légale sur son réseau = seul moyen non-invasif d'obtenir le binaire. Identifier URL serveur + format (`fbxupdate` ? chiffré/signé ?), puis `binwalk`.
 - [ ] **Dump eMMC hors EDL** : ISP/chip-off de l'eMMC, ou shell via UART → `dd` des partitions. Bypasse le besoin de firehose (lecture directe du flash).
 - [ ] Vérifier si un firehose MSM8998 d'un **autre device** passe (peu probable si Secure Boot, mais à tester : certains boards ont QFuse non blown en prod).
 - [ ] **UART en priorité** : si un shell root est accessible au boot, on lit le firmware directement et on saute toute la problématique EDL.
