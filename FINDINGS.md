@@ -101,9 +101,16 @@ Découvert via un scan DHCP/mDNS/UPnP tiers (2026-06-26) :
 - Apps Qt = **C++ compilé** sous le capot → si le sandbox autorise du natif, ≈ exécution arbitraire dans le contexte de l'app → base pour explorer le FS et tenter une **élévation de privilèges** vers root.
 - Remote debugger = **gdbserver** → contrôle mémoire/process.
 
-### Prochaines actions (mode dev)
-- [ ] Activer le mode développeur sur le Player (réglages télécommande).
-- [ ] Re-résoudre `_fbx-devel._tcp` → noter le **port réel** ouvert, fingerprint du service (gdbserver ? protocole maison ?).
+### Protocole du plugin (lu dans les sources `freebox-qtcreator-plugin/src`)
+- `_fbx-devel._tcp` annonce **port 0** même mode dev activé (beacon de présence ; pas de port debug fixe en écoute — confirmé par scan : aucun nouveau port TCP ouvert).
+- `runcontrol.cc` : l'IDE ouvre un serveur local (`mServer.listen()`) puis **se connecte au Player** pour streamer `stdout`/`stderr` de l'app (`connectToHost(mAddress, out/err)`). Ports **négociés dynamiquement** (`canAutoDetectPorts`).
+- `debugger.cc` : debug au niveau **QML** (`qmlServerPort`), pas gdbserver natif exposé.
+- Déploiement par **TAR** (`tar.cc`, `freestorepackager.cc`). Transport **TCP maison** (pas SSH).
+- → Modèle : l'IDE **upload un TAR → le Player l'exécute comme process → streame la sortie**. C'est de l'**exécution de code sur l'appareil**. Pas de port fixe à scanner : il faut **piloter via le plugin**.
+
+### Prochaines actions (mode dev) — ✅ mode dev ACTIVÉ sur le Player
+- [x] Activer le mode développeur sur le Player (fait).
+- [x] Confirmer le comportement `_fbx-devel._tcp` : reste **port 0** (beacon), canal piloté par l'IDE. Aucun port debug ouvert au scan.
 - [ ] Installer QtCreator + plugin Freebox + lib QML `fbx`. Déployer une app test.
 - [ ] Sonder le **contexte d'exécution** de l'app : accès FS, lancement de process, code C++ natif autorisé ? user/uid ? → cartographier la surface d'évasion du sandbox.
 - [ ] Récupérer les **sources GPL** correspondant à `fbx7hd` (kernel/toolchain) → cross-compile.
