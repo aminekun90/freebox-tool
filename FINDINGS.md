@@ -108,9 +108,33 @@ Découvert via un scan DHCP/mDNS/UPnP tiers (2026-06-26) :
 - Déploiement par **TAR** (`tar.cc`, `freestorepackager.cc`). Transport **TCP maison** (pas SSH).
 - → Modèle : l'IDE **upload un TAR → le Player l'exécute comme process → streame la sortie**. C'est de l'**exécution de code sur l'appareil**. Pas de port fixe à scanner : il faut **piloter via le plugin**.
 
-### Prochaines actions (mode dev) — ✅ mode dev ACTIVÉ sur le Player
-- [x] Activer le mode développeur sur le Player (fait).
-- [x] Confirmer le comportement `_fbx-devel._tcp` : reste **port 0** (beacon), canal piloté par l'IDE. Aucun port debug ouvert au scan.
+### 🎯 PROTOCOLE DE DÉPLOIEMENT REVERSÉ + CONFIRMÉ EN LIVE (mode dev actif)
+Endpoint de contrôle **`http://<player>/pub/devel`** (port 80) = **JSON-RPC 2.0**, actif uniquement en mode dev.
+Confirmé live : un GET renvoie `{"jsonrpc":"2.0","error":{"message":"go learn about json-rpc",...}}`.
+
+Découverte du device : **SSDP** (UPnP, `239.255.255.250:1900`, device type **`fbx:devel`**) — pas seulement mDNS.
+
+**Méthode utile : `debug_qml_app`** (les autres → `method not found`, pas d'introspection) :
+```
+POST http://<player>/pub/devel
+{"jsonrpc":"2.0","id":1,"method":"debug_qml_app","params":{"manifest_url":"http://<NOTRE-IP>:<port>/manifest.json"}}
+→ {"qml_port":N,"stdout_port":N,"stderr_port":N}
+```
+Modèle (d'après `remote/remoteqml.cc`) : **on héberge l'app chez nous** (HTTP local servant `manifest.json` + QML), le Player la **fetch, l'exécute, et ouvre 3 ports** auxquels on se connecte pour récupérer `stdout`/`stderr` + le canal de debug QML.
+
+`manifest.json` (format, cf. template SDK) :
+```
+{"name","identifier","description","entryPoints":{"main":{"file":"<Main.qml>","default":true}}}
+```
+
+**Conséquence : on peut tout piloter en Python pur. QtCreator/Qt 5.8 INUTILES pour du QML.**
+
+### ✅ Acquis mode dev
+- [x] Mode développeur activé sur le Player.
+- [x] `_fbx-devel._tcp` reste port 0 (beacon SSDP), le vrai canal est `/pub/devel` JSON-RPC.
+- [x] Protocole `debug_qml_app` reversé depuis les sources LGPL + confirmé live.
+- [ ] Construire le CLI de déploiement (`scripts/fbx-deploy.py`) : HTTP local + JSON-RPC + lecture stdout/stderr.
+- [ ] Déployer une app de sonde QML (Phase 2 : lire `/proc`, FS, uid via XMLHttpRequest file://).
 - [ ] Installer QtCreator + plugin Freebox + lib QML `fbx`. Déployer une app test.
 - [ ] Sonder le **contexte d'exécution** de l'app : accès FS, lancement de process, code C++ natif autorisé ? user/uid ? → cartographier la surface d'évasion du sandbox.
 - [ ] Récupérer les **sources GPL** correspondant à `fbx7hd` (kernel/toolchain) → cross-compile.
