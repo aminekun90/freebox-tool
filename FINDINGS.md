@@ -84,6 +84,30 @@ Avec lui : peek/poke → EL3 → contrôle total (dump eMMC, patch aboot, flash 
 
 Scan complet `-p-` : seuls ces 5 ports (195 autres = filtered). ADB **5555 fermé**.
 
+## ⭐⭐ VOIE PRIORITAIRE — Mode développeur officiel + Remote debugger (`fbx-devel`)
+Découvert via un scan DHCP/mDNS/UPnP tiers (2026-06-26) :
+- **DHCP Vendor Class Identifier = `linux-fbx7hd`** → confirme **Linux**, codename board/firmware `fbx7hd`.
+- **Service mDNS `_fbx-devel._tcp` nommé "Remote debugger"** → résolu à `Freebox-Player.local:0`.
+  Port **0 = dormant** (service annoncé mais pas en écoute). Aucun TXT. Tous les ports debug (23/1234/5555/9000…) filtered.
+- Services supplémentaires actifs : `spotify-connect` (:56071), `hid` (:24322 udp, télécommande), UPnP MediaRenderer (AVTransport/RenderingControl).
+
+### Ce que c'est : le SDK Player officiel de Free
+- `_fbx-devel._tcp` "Remote debugger" = endpoint utilisé par le **plugin Freebox pour QtCreator** ([github.com/fbx/freebox-qtcreator-plugin](https://github.com/fbx/freebox-qtcreator-plugin)) pour découvrir un Player en **mode développeur** et y faire du **remote debug (gdb)**.
+- **SDK Player officiel** : [dev.freebox.fr/sdk/player.html](https://dev.freebox.fr/sdk/player.html). Apps **Qt/QML** + module proprio `fbx`. Déploiement/exécution/debug depuis QtCreator. Packaging TAR. Publication via FreeStore/FreeFactory.
+- **Activation** : menu réglages système du Player, à la télécommande. → fait passer `fbx-devel` de port 0 à un **port réel en écoute**.
+
+### Pourquoi c'est la voie prioritaire (devant l'EDL)
+- **Exécution de code sur l'appareil**, légale, non-invasive, sans déverrouillage bootloader.
+- Apps Qt = **C++ compilé** sous le capot → si le sandbox autorise du natif, ≈ exécution arbitraire dans le contexte de l'app → base pour explorer le FS et tenter une **élévation de privilèges** vers root.
+- Remote debugger = **gdbserver** → contrôle mémoire/process.
+
+### Prochaines actions (mode dev)
+- [ ] Activer le mode développeur sur le Player (réglages télécommande).
+- [ ] Re-résoudre `_fbx-devel._tcp` → noter le **port réel** ouvert, fingerprint du service (gdbserver ? protocole maison ?).
+- [ ] Installer QtCreator + plugin Freebox + lib QML `fbx`. Déployer une app test.
+- [ ] Sonder le **contexte d'exécution** de l'app : accès FS, lancement de process, code C++ natif autorisé ? user/uid ? → cartographier la surface d'évasion du sandbox.
+- [ ] Récupérer les **sources GPL** correspondant à `fbx7hd` (kernel/toolchain) → cross-compile.
+
 ## Services mDNS / UPnP annoncés
 - `_airplay._tcp` → **Freebox Player** @ `Freebox-Player.local:7000`
   - `deviceid=34:27:92:8E:F3:38 features=0x12BFFEBB model=AppleTV3,2 srcvers=220.68 flags=0x44 pk=764648ca…fc5d35 vv=2`

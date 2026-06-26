@@ -24,6 +24,19 @@
 
 → Conclusion : sur APQ8098 avec Secure Boot actif, **brancher l'EDL sans le firehose Free ne donne rien**.
 
+## ⭐⭐ Voie prioritaire découverte : mode développeur officiel (SDK Player)
+
+Le Player annonce un service mDNS `_fbx-devel._tcp` nommé **"Remote debugger"** (port 0 = dormant) et son DHCP Vendor Class est **`linux-fbx7hd`**. C'est l'infra du **SDK Player officiel de Free** : en activant le **mode développeur** (réglages système, télécommande), on peut **déployer, exécuter et débugger (gdb) du code Qt/QML** sur le Player via le plugin [freebox-qtcreator-plugin](https://github.com/fbx/freebox-qtcreator-plugin) — voir [SDK Player](https://dev.freebox.fr/sdk/player.html).
+
+**C'est de l'exécution de code légale et non-invasive, sans toucher au bootloader.** Apps Qt = C++ compilé → si le sandbox autorise du natif, base pour explorer le FS et tenter une élévation vers root. À traiter **avant** l'EDL/hardware.
+
+Étapes :
+1. Activer le mode dev sur le Player.
+2. Re-résoudre `_fbx-devel._tcp` → noter le port réel + fingerprint (gdbserver ?).
+3. QtCreator + plugin Freebox + lib QML `fbx` → déployer une app test.
+4. Sonder le contexte d'exécution (uid, accès FS, process, C++ natif) → surface d'évasion sandbox.
+5. Récupérer les sources GPL `fbx7hd` (kernel/toolchain) pour cross-compiler.
+
 ## Arbre de décision
 
 ```
