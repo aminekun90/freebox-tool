@@ -1,60 +1,94 @@
-# Freebox Delta Player — Software Jailbreak Project
+# Freebox Tool — Devialet/Freebox Delta Player reverse-engineering
 
-## Ambition
+> Reprise de contrôle logicielle d'un **Freebox Delta Player (conçu par Devialet)**,
+> devenu inutile sans abonnement TV Free. **North star : faire tourner Android
+> dessus, en jailbreak 100 % software.** Repli accepté : obtenir un shell, ou
+> réutiliser la machine en **enceinte AirPlay autonome**.
 
-> **But du projet : jailbreaker le Devialet Player (Freebox Delta) et y installer Android.**
+Projet **open source** — recon, notes et outils sont publics pour que d'autres
+propriétaires de Player Delta puissent reproduire, vérifier et avancer ensemble.
 
-Redonner vie à un **Freebox Delta Player (conçu par Devialet)** acheté ~450 € et
-devenu inutile sans abonnement TV Free. Le **north star** = faire tourner
-**Android** dessus, via un **jailbreak 100 % software** (aucune modif hardware au
-départ). Repli acceptable si Android s'avère hors d'atteinte : obtenir un shell /
-réutiliser la machine en **enceinte Devialet autonome** (protocoles audio).
+## ⚖️ Éthique & périmètre
 
-C'est **mon matériel, acheté, sur mon réseau** — démarche de rétro-ingénierie et
-de recon défensive sur un appareil que je possède. Pas d'attaque de tiers, pas de
-contournement de DRM pour du piratage : reprise de contrôle de ma propre machine.
+Démarche de **rétro-ingénierie sur du matériel possédé, sur son propre réseau**.
 
-## Objectifs (du plus simple au plus ambitieux)
+- ✅ Recon non destructive, lecture de services exposés sur le LAN, doc des résultats.
+- ❌ Pas d'attaque de tiers, pas de contournement de DRM pour du piratage, pas de
+  scan d'appareils qu'on ne possède pas.
 
-1. **Cartographier la surface d'attaque** : IP, ports ouverts (TCP/UDP), services,
-   bannières, interfaces de debug/dev.
-2. **Trouver un point d'entrée logiciel** : ADB réseau (5555), shell (telnet/ssh),
-   web admin/dev caché, API locale Devialet/Free, UPnP, endpoints non protégés.
-3. **Activer des flags / mode développeur** sans flash : debug, ADB, services cachés.
-4. **Obtenir un shell** sur la machine.
-5. **Stretch** : booter un OS custom / Android, OU exposer proprement l'audio
-   (AirPlay/Cast/Spotify Connect/DLNA) pour un usage enceinte.
+Ne contribuez avec des résultats que sur **votre propre** Player Delta.
 
-## Réalité connue (honnêteté d'entrée)
+## 📦 Structure du dépôt
+
+```
+freebox-tool/
+├── README.md        # ce fichier — contexte & onboarding
+├── FINDINGS.md      # journal des découvertes (ports, services, mDNS, pistes)
+└── scripts/
+    └── recon.sh     # scan réseau non destructif (nmap + mDNS + SSDP + sonde ADB)
+```
+
+## 🔎 État actuel (2026-06-26)
+
+Premier scan réseau effectué sur un Player Delta réel (détails dans `FINDINGS.md`) :
+
+| Constat | Détail |
+|-|-|
+| Vendor MAC | `FREEBOX SAS` (`34:27:92:…`) |
+| Ports ouverts | 80/8080 (nginx), 554 (`Freebox rtspd 1.2`), 5000+7000 (AirPlay/RAOP) |
+| ADB 5555 | **fermé** |
+| SSH / telnet | absents |
+| AirPlay | `srcvers 220.68`, **`pw=false`** → streaming audio ouvert (enceinte OK) |
+| OS sous-jacent | **Linux** probable (nginx + rtspd + récepteur RAOP soft), pas Android exposé |
+
+**Conclusion provisoire :** appliance Linux verrouillée, surface réseau minimale.
+La voie « Android par le réseau » est étroite. Pistes encore ouvertes ci-dessous.
+
+## 🎯 Objectifs (du plus simple au plus ambitieux)
+
+1. **Cartographier la surface d'attaque** : ports, services, bannières, mDNS/UPnP.
+2. **Trouver un point d'entrée logiciel** : ADB, shell, web/dev caché, API Free/Devialet.
+3. **Activer un mode développeur** sans flash (debug, services cachés).
+4. **Obtenir un shell**.
+5. **Stretch** : booter un OS custom / Android, OU exposer proprement l'audio.
+
+## 🧩 Pistes recherchées (où contribuer)
+
+- [ ] **Fuzzing chemins nginx** (80/8080) — l'UI Free vit peut-être sur un vhost / `Host` header (`mafreebox.freebox.fr`).
+- [ ] **RTSP `Freebox rtspd 1.2`** (554) — surface custom Free, parsing à analyser.
+- [ ] **RAOP `srcvers 220.68`** — chercher CVE/exploits sur récepteurs AirPlay legacy.
+- [ ] **Console série / UART** sur la carte — repli matériel si le réseau est un cul-de-sac.
+- [ ] **Dumps firmware** / analyse du SoC (modèle, bootloader, signature).
+
+## 🚀 Reproduire / contribuer
+
+Pré-requis (macOS) : `nmap`, `adb`, `nc`, `dns-sd`.
+
+```bash
+git clone git@github.com:aminekun90/freebox-tool.git
+cd freebox-tool
+
+# 1) Trouver l'IP de TON player (Freebox OS → DHCP/Appareils, ou ping sweep)
+./scripts/recon.sh 192.168.1.0/24
+
+# 2) Scan complet d'une cible que tu possèdes
+./scripts/recon.sh 192.168.1.0/24 <player-ip>
+```
+
+Le scan écrit un log `recon-<ip>-<date>.log`. Reportez les résultats notables
+dans `FINDINGS.md` puis ouvrez une **PR** ou une **issue**.
+
+### Conventions
+
+- Commits **Conventional Commits** (`docs(recon): …`, `feat(scripts): …`).
+- Recon **non destructive** d'abord ; pas de fuzzing agressif avant d'avoir compris la surface.
+- Documenter chaque étape pour rester réversible (tant qu'on ne flashe rien).
+- Ne committez **jamais** de secrets (tokens API Freebox, clés).
+
+## ⚠️ Réalité connue (honnêteté d'entrée)
 
 - Aucune méthode publique vérifiée pour installer Android sur le Player Delta.
 - Le Player Delta tourne un **OS maison Free** (≠ Android TV du Player Pop).
 - Bootloader probablement verrouillé/signé → l'angle **flash hardware est hostile**.
-- **MAIS** l'angle **services réseau** est inexploré et c'est là qu'on commence :
-  un appareil Devialet expose en général beaucoup de services LAN (mDNS, UPnP,
-  API Spark Devialet…). Le test décisif « y a-t-il un Android/Linux ouvert
-  dessous » = **port 5555 (ADB)** et la présence d'un shell.
-
-## Pré-requis (déjà prêts)
-
-- `nmap`, `adb` installés (Homebrew), `nc`, `dns-sd` (macOS).
-- Accès API Freebox (token en cache dans `../k8s-project/scripts/.fbx_token.json`,
-  droit *settings*) → permet de **lister les baux DHCP** pour trouver l'IP du Player.
-
-## Plan pour demain (device branché)
-
-1. Brancher le Player au réseau (Ethernet de préférence, plus stable pour le scan).
-2. **Trouver son IP** :
-   - Freebox OS → Paramètres → DHCP / Appareils, repérer l'hôte Devialet/Freebox,
-   - ou `./scripts/recon.sh 192.168.1.0/24` (ping sweep + ARP).
-3. **Scanner** : `./scripts/recon.sh 192.168.1.0/24 <player-ip>` (full TCP + UDP
-   clés + version + mDNS + SSDP + sonde ADB).
-4. Noter **tout** dans `FINDINGS.md`.
-5. Selon les ports trouvés, choisir l'angle (ADB connect, web, telnet, API audio).
-
-## Sécurité / garde-fous
-
-- Recon **non destructive** d'abord (scan, lecture). Pas de fuzzing agressif tant
-  qu'on n'a pas compris la surface.
-- Tout est réversible tant qu'on ne flashe rien.
-- On documente chaque étape pour pouvoir revenir en arrière.
+- L'angle **services réseau** reste le point de départ le moins coûteux.
+</content>
