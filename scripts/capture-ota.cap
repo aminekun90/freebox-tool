@@ -1,0 +1,26 @@
+# bettercap caplet — capture du canal OTA du Freebox Player
+# Cible = TON Player uniquement. Usage légal sur ton propre réseau.
+# Lancement : sudo bettercap -iface en0 -caplet scripts/capture-ota.cap
+
+set $ {by}{fw}{cyan}freebox-ota{reset} {bold}»{reset} %
+
+# --- Découverte d'hôtes (indispensable : arp.spoof a besoin du MAC du Player) ---
+net.recon on
+net.probe on
+
+# --- Cible : le Player seulement ---
+set arp.spoof.targets 192.168.1.173
+set arp.spoof.internal false
+set arp.spoof.fullduplex true
+
+# --- Sniffer : tout le trafic du Player, écrit en pcap + parse DNS/HTTP ---
+set net.sniff.filter host 192.168.1.173
+set net.sniff.output /Users/amine/Projects/freebox-tool/ota-capture.pcap
+set net.sniff.verbose true
+set net.sniff.local true
+
+# --- Go ---
+arp.spoof on
+net.sniff on
+
+events.stream on

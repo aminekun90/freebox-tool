@@ -105,6 +105,17 @@ RTSP 5000 OPTIONS confirme : `OPTIONS, ANNOUNCE, SETUP, RECORD, SET_PARAMETER, G
 - ~40 chemins courants (api/v8, system, status, firmware, debug, spark, devialet, player…) → **tous 404** sur 80 ET 8080.
 - nginx route donc sur des routes internes très spécifiques (hash/proxy). Fuzzing wordlist large (`ffuf`) requis pour aller plus loin.
 
+## ⚠️ Le Player détecte le MITM (anti-ARP-spoof / intégrité réseau)
+**Test reproduit 2x (2026-06-26)** : un ARP-spoof bettercap ciblant le Player provoque, après ~10-30 s, une **mise en sécurité avec bip audible toutes les 5-10 s**. L'arrêt du spoof (restauration ARP) fait cesser le bip.
+- Le MITM L2 capture bien les paquets (~150 sur un essai), mais le Player **réagit** : soit protection anti-MITM, soit perte de sa session TLS authentifiée au serveur Free.
+- **Conséquence : l'ARP-spoofing est inutilisable** pour capturer l'OTA.
+- **Note DHCP** : le Player change d'IP au reboot (`.173` → `.174`). L'identifier par **MAC** (`34:27:92:8E:F3:38`), pas par IP. Script `scripts/capture-ota.sh` résout l'IP via le MAC.
+
+### Méthode de capture propre à privilégier
+Devenir la **vraie passerelle** du Player (pas de spoof) → aucune anomalie détectable :
+- **Partage Internet macOS** : Player en Ethernet sur adaptateur USB-Eth du Mac ; Mac = DHCP+NAT+gateway, uplink Wi-Fi vers Freebox. `tcpdump` sur l'iface du Player.
+- Alternative : switch manageable avec **port mirroring** entre Player et Freebox.
+
 ## ADB (port 5555)
 - État : **fermé** (filtered, pas de réponse)
 - Aucune piste Android exposée côté réseau.
