@@ -116,6 +116,12 @@ Devenir la **vraie passerelle** du Player (pas de spoof) → aucune anomalie dé
 - **Partage Internet macOS** : Player en Ethernet sur adaptateur USB-Eth du Mac ; Mac = DHCP+NAT+gateway, uplink Wi-Fi vers Freebox. `tcpdump` sur l'iface du Player.
 - Alternative : switch manageable avec **port mirroring** entre Player et Freebox.
 
+### État : voie réseau software ÉPUISÉE (2026-06-26)
+- Reset usine testé → **aucune** nouvelle surface (mêmes 5 ports, nginx 404, ADB 5555 toujours filtered).
+- ARP-spoof → bip sécurité (cf. ci-dessus). Inutilisable.
+- Capture propre (vraie passerelle) **bloquée faute de matériel** : pas d'adaptateur USB-Ethernet ni de switch manageable côté testeur.
+- **Déblocage peu coûteux pour un contributeur** : un **adaptateur USB-Ethernet (~10-15 €)** OU un **switch manageable avec port mirroring** rouvre immédiatement la capture OTA non-invasive (activation, hostnames serveurs Free, format firmware). C'est la dernière piste software propre avant le hardware.
+
 ## ADB (port 5555)
 - État : **fermé** (filtered, pas de réponse)
 - Aucune piste Android exposée côté réseau.
