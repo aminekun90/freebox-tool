@@ -1,4 +1,7 @@
 *.log
 recon-*.log
 *.pcap
+firmware/
+*.img
+*.bin
 .DS_Store

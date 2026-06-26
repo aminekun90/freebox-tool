@@ -218,6 +218,35 @@ RTSP 5000 OPTIONS confirme : `OPTIONS, ANNOUNCE, SETUP, RECORD, SET_PARAMETER, G
 - ~40 chemins courants (api/v8, system, status, firmware, debug, spark, devialet, player…) → **tous 404** sur 80 ET 8080.
 - nginx route donc sur des routes internes très spécifiques (hash/proxy). Fuzzing wordlist large (`ffuf`) requis pour aller plus loin.
 
+## 🔓 FIRMWARE OTA — récupéré en clair (HTTP public)
+Capture transparente (Mac = vraie passerelle via Partage Internet, **pas de MITM, pas de bip**) au reboot du Player → protocole OTA complet en **HTTP clair** sur **`fbx-firmware.proxad.net`** (Proxad = Free).
+
+### Protocole de mise à jour
+- Manifests JSON par composant : `GET /firmwares/fbx7hd/{boot0+bank0,boot1,bank1}/firmware_info_<MAC>.json?model=948902&mode=free&schema_version=1.0` (+ `.sign`).
+- Config device : `GET /config/fbx7hd/cfg_<MAC>.json` (+ `.sign`).
+- Chaque manifest contient `file_full_url` + `version` + `version_md5sum`.
+
+### Images (téléchargeables publiquement, md5 vérifiés)
+| Image | URL `…/firmwares/fbx7hd/files/` | Taille | Contenu |
+|-|-|-|-|
+| **bank1** (système) | `bank1/image-fbx7hd_bank1_1.5.24.2` | 137 Mo | kernel+dtbs+rootfs **CHIFFRÉS** |
+| **boot0+bank0** | `boot0+bank0/boot0_42.20+bank0_1.2` | 28,8 Mo | **chaîne de boot EN CLAIR** |
+| **boot1** | `boot1/boot1_42.20` | 8,4 Mo | bootchain (BOOTCHN) |
+
+(Binaires non commités — gitignore. md5 bank1 `cd14f01adca7d80100569c8afd2bdcfc` ✓.)
+
+### Analyse offline
+- **bank1** : conteneur maison (magic `6e48d66b…`, build `rawoul@speedcore`), TOC = `kernel`(0x1000)/`qcom-dtbs`(0x5b3000)/`rootfs`(0x5c1000, 128 Mo). kernel/dtbs en conteneur **`SKRY`** signé ; **rootfs entropie 8.000 → chiffré (AES)**. → **système non reversable offline** sans la clé (TZ/QFPROM, device-bound).
+- **boot0+bank0** : conteneur **`BOOTCHN`**, **non chiffré** → binwalk voit des dizaines d'ELF ARM64. Composants : **XBL/SBL1, ABL (UEFI), HYP, cmnlib, DevCfg, Sahara** + **AVB** (`avb+`). Build paths Qualcomm `Msm8998Pkg` (dev `rawoul`).
+- **Banking A/B** : `bank0` peut être **forcé par GPIO** (`bank0 boot is forced`, `bank0 boot gpio active`) → **test point hardware de recovery** à identifier (recoupe la voie UART/EDL).
+
+### Cible offline riche (Phase 4)
+La chaîne de boot en clair (ABL/XBL/HYP) est le terrain de l'analyse secure-boot :
+- [ ] Désassembler **ABL** (Ghidra) : parsing fastboot/commandes, vérif signature, `unlock`.
+- [ ] **XBL/SBL1 + Sahara** : recoupe l'angle EDL (firehose) de `ATTACK-ROADMAP.md`.
+- [ ] Trouver la **dérivation de clé** du rootfs (probable TZ → non extractible offline, mais comprendre le schéma).
+- [ ] Localiser le **GPIO bank0-forced** → recovery hardware.
+
 ## ⚠️ Le Player détecte le MITM (anti-ARP-spoof / intégrité réseau)
 **Test reproduit 2x (2026-06-26)** : un ARP-spoof bettercap ciblant le Player provoque, après ~10-30 s, une **mise en sécurité avec bip audible toutes les 5-10 s**. L'arrêt du spoof (restauration ARP) fait cesser le bip.
 - Le MITM L2 capture bien les paquets (~150 sur un essai), mais le Player **réagit** : soit protection anti-MITM, soit perte de sa session TLS authentifiée au serveur Free.
