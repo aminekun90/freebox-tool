@@ -28,9 +28,18 @@
   - → Aucune voie officielle ne viendra. Le jailbreak communautaire est la **seule** option. Free n'a Android TV que sur Pop (Amlogic S905X2) et V9.
 
 ### Pistes hardware d'entrée (toutes légales sur matériel possédé)
-- [ ] **EDL mode / Qualcomm 9008** (USB) — point d'entrée classique SD835. Besoin d'un *firehose programmer* signé pour ce board (souvent extrait par device). Permet dump/flash eMMC.
-- [ ] **UART / console série** sur la carte — repérer le shell U-Boot/LK.
+- [ ] **EDL mode / Qualcomm 9008** (USB) — point d'entrée classique SD835. Besoin d'un *firehose programmer* signé pour ce board (souvent extrait par device). Permet dump/flash du stockage.
+- [ ] **UART / console série** sur la carte — repérer le shell U-Boot/LK. **Test points candidats : TP5 / TP6 / TP7** (TX/RX/GND) d'après [EricBlanquer/freebox-devialet-hack](https://github.com/EricBlanquer/freebox-devialet-hack). Adaptateur CP2102.
 - [ ] CVE chaîne de boot Qualcomm 835-class (LK / aboot / XBL) pour déverrouillage bootloader.
+
+### Référence communautaire — [EricBlanquer/freebox-devialet-hack](https://github.com/EricBlanquer/freebox-devialet-hack)
+Autre projet de root du Player Devialet (motivation : réparer Alexa). **Même mur : ni root ni shell à ce jour.** Apports hardware (corroborent + complètent) :
+- SoC **APQ8098** confirmé indépendamment.
+- Stockage = **UFS 32 Go** (⚠️ pas eMMC — corrige notre hypothèse ; impacte la méthode de dump physique : ISP UFS ≠ ISP eMMC).
+- RAM LPDDR4 2 Go. Wi-Fi/BT **QCA6174** suspecté. Ethernet + codec audio **Realtek**.
+- **UART : TP5/TP6/TP7**. Connecteur USB-C parfois dessoudé d'usine (à ressouder).
+- Même plan d'attaque que nous : nmap → ADB/fastboot → UART → EDL.
+- → **Contributeur potentiel à contacter** pour mutualiser l'effort.
 
 ### Exploits / techniques publiques applicables au MSM8998/APQ8098
 | Piste | Détail | Applicabilité Player Devialet |

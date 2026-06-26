@@ -87,7 +87,7 @@ Avantage bonus : le Mac voyant **tout** le trafic en clair au niveau IP, on peut
 - [ ] **Veille CVE chaîne de boot MSM8998** : XBL/ABL/LK, anti-rollback, Sahara. Réévaluer [CVE-2021-1931](https://xdaforums.com/t/xz1c-xz1-xzp-xperable-xperia-abl-fastboot-exploit-cve-2021-1931.4771931/) (Sony-only aujourd'hui) si une surface fastboot apparaît.
 
 ### Tier 1 — Investigation hardware non destructive (besoin du board ouvert)
-- [ ] **Repérer l'UART** (TX/RX/GND, souvent 1.8 V) sur la carte. Capturer le log de boot (U-Boot/LK) → révèle bootloader, version, éventuel shell.
+- [ ] **Repérer l'UART** (TX/RX/GND, souvent 1.8 V) sur la carte. Capturer le log de boot (U-Boot/LK) → révèle bootloader, version, éventuel shell. **Pistes communautaires : test points `TP5`/`TP6`/`TP7`** ([EricBlanquer/freebox-devialet-hack](https://github.com/EricBlanquer/freebox-devialet-hack), adaptateur CP2102). Stockage **UFS** (≠ eMMC) → adapter la méthode de dump physique.
 - [ ] **Repérer les test points EDL** : court-circuiter au GND au boot jusqu'à énumérer `Qualcomm HS-USB 9008`. Documenter leur position (photo annotée).
 - [ ] **Dumper le hello Sahara** avec `edl.py` une fois en 9008 → hardware-ID, PK hash, état secure boot.
 
