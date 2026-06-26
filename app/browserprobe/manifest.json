@@ -1,0 +1,11 @@
+{
+    "name": "FbxBrowserProbe",
+    "identifier": "tool.freebox.browserprobe",
+    "description": "Capability test — opens a controlled page in the system browser",
+    "entryPoints": {
+        "main": {
+            "file": "Main.qml",
+            "default": true
+        }
+    }
+}

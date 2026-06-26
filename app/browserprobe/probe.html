@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>fbx capability test</title></head>
+<body style="background:#101018;color:#3f6;font-family:monospace;font-size:20px">
+<h2>FBX browser capability test</h2>
+<pre id="out">running…</pre>
+<script>
+// Page de test servie par notre propre serveur. Rapporte ses observations
+// via de simples GET (visibles dans les logs du serveur). Recherche sur
+// matériel possédé, à but de documentation des capacités du composant.
+var out = document.getElementById('out');
+function show(s){ out.textContent += "\n" + s; }
+function beacon(tag, val){
+  try {
+    var i = new Image();
+    i.src = "/REPORT?" + tag + "=" + encodeURIComponent(String(val).slice(0,300)) + "&t=" + Date.now();
+  } catch(e){}
+  show(tag + ": " + String(val).slice(0,120));
+}
+
+beacon("loaded", "1");
+beacon("userAgent", navigator.userAgent);
+beacon("location", location.href);
+
+// Test : le composant peut-il atteindre des services loopback du device ?
+function tryFetch(label, url){
+  try {
+    fetch(url, {mode:"no-cors"})
+      .then(function(r){ beacon(label, "ok status=" + r.status); })
+      .catch(function(e){ beacon(label, "err " + e); });
+  } catch(e){ beacon(label, "exc " + e); }
+}
+tryFetch("loop80", "http://127.0.0.1/pub/devel");
+tryFetch("self80", "http://127.0.0.1:80/");
+</script>
+</body>
+</html>

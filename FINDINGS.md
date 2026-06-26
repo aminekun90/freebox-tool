@@ -166,6 +166,14 @@ Le sandbox QML **n'expose aucune primitive** fichier/exec/IPC privilégiée. `fi
 - `Qt.openUrlExternally(url)` renvoie `true` pour toute URL (`http`, `file://`, `fbx://`, schémas custom) **mais sans effet observable** (aucun navigateur système, notre serveur ne reçoit rien). Pas d'évasion directe constatée.
 - Piste ouverte : **vocabulaire des schémas `fbx://`** (verbes privilégiés : install/launch/settings ?) — non documenté, effets non observables côté app. À fuzzer si on trouve un canal de retour.
 
+### 🌐 Pivot navigateur système (WebKit) — via le chooser d'intent
+`Qt.openUrlExternally(<http url>)` déclenche un **chooser système** sur la TV (navigateur / app / téléchargements). En choisissant **navigateur**, une page **qu'on sert nous-même** se charge et **exécute son JS** (callbacks GET reçus sur notre serveur).
+- **Moteur** : `Mozilla/5.0 (Freebox; fbx7hd-delta/1.5.24.2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15` → **WebKit 605.1.15 / Safari 16**.
+- Process distinct du runtime QML `fbxqmltv` → **surface plus large** que le sandbox app.
+- `fetch("http://127.0.0.1:80/…")` depuis le navigateur → `Load failed` (loopback :80 non atteignable / bloqué).
+- Cible « **mes téléchargements** » non encore testée → potentielle **primitive d'écriture fichier**.
+- Capacités à cartographier côté navigateur : scan loopback multi-ports, `file://`, lecture de ressources locales, WASM. (Surface WebKit versionnée = à documenter.)
+
 ### Pistes d'escalade restantes (Phase 3 — recherche)
 - [ ] **`fbx.web`** : composant WebView/navigateur embarqué ? → surface browser (file://, bridge JS, exploits moteur web). À introspecter.
 - [ ] **Plugin natif via `importPaths`** : le `.fbxproject` mentionne `importPaths`. Charger un plugin QML compilé (.so aarch64) servi par nous ? (probablement restreint aux chemins locaux).

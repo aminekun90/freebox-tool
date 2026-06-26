@@ -64,6 +64,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("app_dir")
     ap.add_argument("--player", default=None)
+    ap.add_argument("--seconds", type=int, default=20,
+                    help="durée pendant laquelle servir l'app + lire la sortie")
     args = ap.parse_args()
 
     player = args.player or find_player_ip()
@@ -88,9 +90,9 @@ def main():
     threads = [threading.Thread(target=stream_port, args=(player, out_p, "stdout"), daemon=True),
                threading.Thread(target=stream_port, args=(player, err_p, "stderr"), daemon=True)]
     for t in threads: t.start()
-    print("→ lecture stdout/stderr (Ctrl-C pour arrêter)…")
+    print(f"→ lecture stdout/stderr {args.seconds}s (Ctrl-C pour arrêter)…")
     try:
-        time.sleep(20)
+        time.sleep(args.seconds)
     except KeyboardInterrupt:
         pass
     print("→ fin.")
