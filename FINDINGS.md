@@ -172,7 +172,10 @@ Le sandbox QML **n'expose aucune primitive** fichier/exec/IPC privilégiée. `fi
 - Process distinct du runtime QML `fbxqmltv` → **surface plus large** que le sandbox app.
 - `fetch("http://127.0.0.1:80/…")` depuis le navigateur → `Load failed` (loopback :80 non atteignable / bloqué).
 - Cible « **mes téléchargements** » non encore testée → potentielle **primitive d'écriture fichier**.
-- Capacités à cartographier côté navigateur : scan loopback multi-ports, `file://`, lecture de ressources locales, WASM. (Surface WebKit versionnée = à documenter.)
+- Capacités testées côté navigateur (matériel possédé) :
+  - **`file://` bloqué** (`/etc/passwd`, `/proc/version` → status=0) — même politique que le QML.
+  - **Loopback non atteignable** : scan de ~23 ports `127.0.0.1` → aucun `fetch` résolu (rien d'ouvert, ou blocage **Private Network Access** de Safari 16).
+- → Le navigateur est un **vrai moteur WebKit** mais **bridé** par ses propres politiques (file://, PNA). Reste exploitable seulement via **bug moteur WebKit** (exploit-dev lourd) — hors périmètre des sondes simples.
 
 ### Pistes d'escalade restantes (Phase 3 — recherche)
 - [ ] **`fbx.web`** : composant WebView/navigateur embarqué ? → surface browser (file://, bridge JS, exploits moteur web). À introspecter.

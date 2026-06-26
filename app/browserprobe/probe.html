@@ -1,37 +1,47 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>fbx capability test</title></head>
-<body style="background:#101018;color:#3f6;font-family:monospace;font-size:20px">
-<h2>FBX browser capability test</h2>
+<head><meta charset="utf-8"><title>fbx capability map</title></head>
+<body style="background:#101018;color:#3f6;font-family:monospace;font-size:18px">
+<h2>FBX browser capability map</h2>
 <pre id="out">running…</pre>
 <script>
-// Page de test servie par notre propre serveur. Rapporte ses observations
-// via de simples GET (visibles dans les logs du serveur). Recherche sur
-// matériel possédé, à but de documentation des capacités du composant.
+// Cartographie des capacités du navigateur système — matériel possédé, documentation.
 var out = document.getElementById('out');
-function show(s){ out.textContent += "\n" + s; }
 function beacon(tag, val){
-  try {
-    var i = new Image();
-    i.src = "/REPORT?" + tag + "=" + encodeURIComponent(String(val).slice(0,300)) + "&t=" + Date.now();
+  try { var i = new Image();
+    i.src = "/REPORT?" + tag + "=" + encodeURIComponent(String(val).slice(0,200)) + "&t=" + Date.now();
   } catch(e){}
-  show(tag + ": " + String(val).slice(0,120));
+  out.textContent += "\n" + tag + ": " + String(val).slice(0,90);
 }
 
-beacon("loaded", "1");
-beacon("userAgent", navigator.userAgent);
-beacon("location", location.href);
+beacon("ua", navigator.userAgent);
 
-// Test : le composant peut-il atteindre des services loopback du device ?
-function tryFetch(label, url){
+// (1) Scan loopback : un fetch no-cors résolu = port ouvert, rejeté = fermé/filtré
+var ports = [80,443,3215,8080,8095,9091,9000,8000,8888,7000,5000,1234,
+             4000,8001,8009,8081,8082,3000,9999,11111,2323,8123,8090];
+function scan(port){
+  var url = "http://127.0.0.1:" + port + "/";
+  fetch(url, {mode:"no-cors", cache:"no-store"})
+    .then(function(){ beacon("loop_open", port); })
+    .catch(function(){ /* fermé : on ne spam pas */ });
+}
+for (var i=0;i<ports.length;i++) scan(ports[i]);
+
+// (2) Accès file:// depuis WebKit ?
+function fileTest(path){
   try {
-    fetch(url, {mode:"no-cors"})
-      .then(function(r){ beacon(label, "ok status=" + r.status); })
-      .catch(function(e){ beacon(label, "err " + e); });
-  } catch(e){ beacon(label, "exc " + e); }
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = function(){
+      if (x.readyState===4) beacon("file", path + " -> status=" + x.status + " len=" + (x.responseText||"").length);
+    };
+    x.open("GET", "file://" + path); x.send();
+  } catch(e){ beacon("file", path + " EXC " + e); }
 }
-tryFetch("loop80", "http://127.0.0.1/pub/devel");
-tryFetch("self80", "http://127.0.0.1:80/");
+fileTest("/etc/passwd");
+fileTest("/proc/version");
+
+// fin
+setTimeout(function(){ beacon("done", "1"); }, 4000);
 </script>
 </body>
 </html>
