@@ -1,0 +1,11 @@
+{
+    "name": "FbxProbe",
+    "identifier": "tool.freebox.probe",
+    "description": "Sandbox probe — reads /proc and FS via QML",
+    "entryPoints": {
+        "main": {
+            "file": "Main.qml",
+            "default": true
+        }
+    }
+}
