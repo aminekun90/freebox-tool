@@ -156,6 +156,10 @@ Modèle (d'après `remote/remoteqml.cc`) : **on héberge l'app chez nous** (HTTP
 
 ### Verdict Phase 2 : pas d'évasion via l'API standard
 Le sandbox QML **n'expose aucune primitive** fichier/exec/IPC privilégiée. `file://` bloqué, pas d'écriture, modules bénins.
+- **`fbx.web`** = libs JS client (Http/Rest/JsonRpc/FreeboxOS), **pas de WebView**. Types non instanciables (appelés comme `Http.get()`).
+- **XHR verrouillé à l'origine** (testé) : l'app n'atteint **que son serveur de manifest**. Player LAN `:80`, `127.0.0.1:80`, hosts publics → **tous status=0**. Donc **pas de SSRF / pas de pivot loopback** vers les services internes.
+- `Application.contents` = simple liste des enfants UI.
+- **Sandbox réseau + FS hermétique.** Code execution réelle mais confinée.
 
 ### Pistes d'escalade restantes (Phase 3 — recherche)
 - [ ] **`fbx.web`** : composant WebView/navigateur embarqué ? → surface browser (file://, bridge JS, exploits moteur web). À introspecter.

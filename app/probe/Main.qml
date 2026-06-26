@@ -8,27 +8,30 @@ Application {
 
     Rectangle {
         anchors.fill: parent; color: "#101018"
-        Text { anchors.fill: parent; anchors.margins: 20
-            color: "#33ff66"; font.pixelSize: 17; font.family: "monospace"
+        Text { anchors.fill: parent; anchors.margins: 18
+            color: "#33ff66"; font.pixelSize: 16; font.family: "monospace"
             text: app.log; wrapMode: Text.WrapAnywhere }
     }
 
+    function test(label, url) {
+        var x = new XMLHttpRequest();
+        x.onreadystatechange = function() {
+            if (x.readyState === XMLHttpRequest.DONE)
+                p(label + " -> status=" + x.status + " len=" + (x.responseText||"").length);
+        };
+        try { x.open("GET", url); x.timeout = 3000; x.send(); }
+        catch(e){ p(label + " EXC " + e); }
+    }
+
     Component.onCompleted: {
-        p("===== FBX DEVICE INFO =====");
-        try {
-            var o = Qt.createQmlObject(
-                'import QtQuick 2.5; import fbx.system 1.0; QtObject{' +
-                ' property string model: Device.model;' +
-                ' property string fw: Device.firmwareVersion;' +
-                ' property int hdcp: Device.hdcpVersion;' +
-                ' property int hdr: Device.hdrModes;' +
-                ' property bool is4k: Device.is4k }', app, "dev");
-            p("model=" + o.model);
-            p("firmwareVersion=" + o.fw);
-            p("hdcpVersion=" + o.hdcp);
-            p("hdrModes=" + o.hdr + " is4k=" + o.is4k);
-            o.destroy();
-        } catch(e) { p("Device ERR " + e); }
-        p("===== END =====");
+        p("===== XHR POLICY TEST =====");
+        // (a) notre serveur = origine de l'app
+        test("[origin-ourserver]", Qt.resolvedUrl("manifest.json"));
+        // (b) IP LAN du Player, nginx :80 connu ouvert
+        test("[player-LAN :80]", "http://192.168.1.174/pub/devel");
+        // (c) loopback :80
+        test("[loopback :80]", "http://127.0.0.1/pub/devel");
+        // (d) host public
+        test("[public]", "http://example.com/");
     }
 }
