@@ -22,11 +22,16 @@ Ne contribuez avec des résultats que sur **votre propre** Player Delta.
 
 ```
 freebox-tool/
-├── README.md        # ce fichier — contexte & onboarding
-├── FINDINGS.md      # journal des découvertes (ports, services, mDNS, pistes)
+├── README.md           # ce fichier — contexte & onboarding
+├── FINDINGS.md         # journal des découvertes (ports, services, mDNS, hardware, EDL)
+├── ATTACK-ROADMAP.md   # 🎯 plan d'attaque bootloader/EDL pour contributeurs
 └── scripts/
-    └── recon.sh     # scan réseau non destructif (nmap + mDNS + SSDP + sonde ADB)
+    └── recon.sh        # scan réseau non destructif (nmap + mDNS + SSDP + sonde ADB)
 ```
+
+> **Tu veux contribuer au jailbreak ?** Lis [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md) :
+> la voie réseau est un cul-de-sac, le chemin réaliste passe par l'EDL/bootloader
+> du SoC **Qualcomm APQ8098**. Tâches concrètes par niveau d'effort.
 
 ## 🔎 État actuel (2026-06-26)
 
@@ -89,6 +94,7 @@ dans `FINDINGS.md` puis ouvrez une **PR** ou une **issue**.
 
 - Aucune méthode publique vérifiée pour installer Android sur le Player Delta.
 - Le Player Delta tourne un **OS maison Free** (≠ Android TV du Player Pop).
-- Bootloader probablement verrouillé/signé → l'angle **flash hardware est hostile**.
-- L'angle **services réseau** reste le point de départ le moins coûteux.
+- **Le matériel n'est PAS le problème** : SoC APQ8098 = Snapdragon 835, Android-natif. Le verrou est la **chaîne de boot signée**.
+- La voie **services réseau** est désormais close (surface minimale, tout en 404).
+- Le chemin réaliste se ramène à **un seul artefact** : le firehose Free signé du board. Détails et tâches dans [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md).
 </content>
