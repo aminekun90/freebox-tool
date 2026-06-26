@@ -133,8 +133,24 @@ Modèle (d'après `remote/remoteqml.cc`) : **on héberge l'app chez nous** (HTTP
 - [x] Mode développeur activé sur le Player.
 - [x] `_fbx-devel._tcp` reste port 0 (beacon SSDP), le vrai canal est `/pub/devel` JSON-RPC.
 - [x] Protocole `debug_qml_app` reversé depuis les sources LGPL + confirmé live.
-- [ ] Construire le CLI de déploiement (`scripts/fbx-deploy.py`) : HTTP local + JSON-RPC + lecture stdout/stderr.
-- [ ] Déployer une app de sonde QML (Phase 2 : lire `/proc`, FS, uid via XMLHttpRequest file://).
+- [x] **CLI `scripts/fbx-deploy.py` fonctionnel** : HTTP local + JSON-RPC `debug_qml_app` + lecture stdout/stderr. Params requis : `manifest_url`, `entry_point` (clé de `entryPoints`, ex `"main"`), `wait` (bool).
+- [x] **CODE EXECUTION OBTENUE** : app QML exécutée sur le Player, sortie récupérée par réseau, rendu visible sur la TV. Zéro QtCreator.
+
+### Carte du sandbox (Phase 2 — en cours)
+- **OS** = `linux` (confirmé via `Qt.platform.os`).
+- **`file://` totalement bloqué** : XHR sur `/proc/*`, `/etc/*` → *"Access prohibited"* (whitelist custom). Pas de lecture FS via QML XHR.
+- App servie **depuis notre HTTP** (pas de dossier app local sur le FS device). `Qt.resolvedUrl` pointe sur notre serveur.
+- Structure d'app valide : `import QtQuick 2.5` + `import fbx.application 1.0`, racine **`Application`** (framework Free, attend `handleUrl()`).
+- **Module `fbx.application` — `Application` expose des propriétés privilégiées Free** (au-delà du Window Qt) :
+  `accountId`, `profileId`, `consoleWidget`, `consoleState`, `appState`, `remoteMapping`, `contents`, `log`.
+  → `console*` (console de debug ?) et `accountId/profileId` (infos compte) = à sonder.
+- **Module QML absents** : `Qt.labs.folderlistmodel` non installé (Qt 5.8 minimal sur device).
+
+### Prochaines sondes
+- [ ] Lire `appState`, `consoleState`, `remoteMapping`, `contents` (ne PAS publier `accountId/profileId` = perso).
+- [ ] Énumérer les autres modules `fbx.*` (media/system/tv/input…) → APIs privilégiées exposées aux apps.
+- [ ] Tester capacités : `QProcess`/exec (probable absent en QML pur), sockets, écriture (`Settings`/`LocalStorage` → révèle chemin writable + uid).
+- [ ] Cibler une **API fbx exposant le système** (lecture conf, lancement d'app native, IPC) comme primitive d'évasion.
 - [ ] Installer QtCreator + plugin Freebox + lib QML `fbx`. Déployer une app test.
 - [ ] Sonder le **contexte d'exécution** de l'app : accès FS, lancement de process, code C++ natif autorisé ? user/uid ? → cartographier la surface d'évasion du sandbox.
 - [ ] Récupérer les **sources GPL** correspondant à `fbx7hd` (kernel/toolchain) → cross-compile.
