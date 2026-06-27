@@ -119,22 +119,31 @@ def main():
         case = mutate(rng.choice(base), rng)
         send_raw(ip, args.port, case, read=False)   # fire-and-forget
         if i % 25 == 0:                       # liveness périodique
-            if not alive(ip, args.port):
-                # confirmer (vrai crash vs timeout transitoire)
-                time.sleep(1)
-                if not alive(ip, args.port):
+            # 1) suspicion : liveness perdue (peut être juste la charge)
+            if not alive(ip, args.port) and not alive(ip, args.port):
+                # 2) laisser le daemon respirer (la charge retombe)
+                recovered = False
+                for _ in range(30):
+                    time.sleep(2)
+                    if alive(ip, args.port): recovered = True; break
+                if not recovered:
+                    print(f"⚠️ service mort et non revenu @ cas {i} (vrai crash dur ?) — arrêt");
+                    fn = os.path.join(OUTDIR, f"hardcrash_{args.port}_{i}_{int(time.time())}.bin")
+                    open(fn, "wb").write(case); break
+                # 3) CONFIRMATION : rejouer le cas isolément ; ne compter que si ça RE-tue
+                send_raw(ip, args.port, case, read=False)
+                time.sleep(0.5)
+                if not alive(ip, args.port) and not alive(ip, args.port):
                     crashes += 1
                     fn = os.path.join(OUTDIR, f"crash_{args.port}_{i}_{int(time.time())}.bin")
                     open(fn, "wb").write(case)
-                    print(f"💥 CRASH @ cas {i} → {fn} ({len(case)} o)")
-                    # attendre la reprise du daemon
+                    print(f"💥 CRASH REPRODUIT @ cas {i} → {fn} ({len(case)} o)")
                     for _ in range(30):
                         time.sleep(2)
                         if alive(ip, args.port): break
-                    else:
-                        print("⚠️ service non revenu après 60s — arrêt"); break
                     if not args.__dict__["continue_on_crash"]:
-                        print("→ stop sur 1er crash (relance avec --continue-on-crash pour continuer)"); break
+                        print("→ stop sur 1er crash confirmé"); break
+                # sinon : faux positif (charge), on continue silencieusement
         if i % 500 == 0 and i: print(f"  …{i} cas, {crashes} crash(es)")
     print(f"✓ terminé. {crashes} crash(es). Reproducteurs dans {OUTDIR}/")
 
