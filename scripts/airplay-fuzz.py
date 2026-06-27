@@ -118,6 +118,7 @@ def main():
     for i in range(args.n):
         case = mutate(rng.choice(base), rng)
         send_raw(ip, args.port, case, read=False)   # fire-and-forget
+        time.sleep(0.004)                            # throttle léger (stabilité liveness)
         if i % 25 == 0:                       # liveness périodique
             # 1) suspicion : liveness perdue (peut être juste la charge)
             if not alive(ip, args.port) and not alive(ip, args.port):
