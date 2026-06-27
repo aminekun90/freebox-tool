@@ -302,8 +302,15 @@ Portail de conformité GPL de Free. Seules les **parties open-source** sont publ
   - `drivers/misc/fbxserial_of.c` (`fbxserial.h`) → blob **identité/clés par device**.
 - **Pas de LSM custom** (security/ = commoncap/lsm_audit standards). → **Le sandbox "Access prohibited" du QML est userland (runtime `fbxqmltv`), PAS kernel.** Conséquence : du **code natif hors-QML** (post-exploit) ne subirait pas cette restriction de chemin.
 
+### Montage rootfs & boot (analyse du patch kernel)
+- **dm-verity** via cmdline `dm="... verity payload=.. hashtree=.. alg=sha1"` (parser `init/do_mounts_dm.c`, style ChromeOS). **dm-verity = intégrité, pas chiffrement.**
+- **`req-dm-crypt`** présent = dm-crypt Qualcomm via **ICE (Inline Crypto Engine)** → chiffrement disque HW possible. `heh(aes)` enregistré (mode wide-block). → rootfs prod probablement **verity + dm-crypt ICE**.
+- ⚠️ **Cmdline baked dans le kernel = config DEV/USINE NFS** : `root=/dev/nfs ip=…eth0.41:dhcp dhcpclass=linux-fbx7hd earlycon=msm_serial_dm,0xc1b0000 console=ttyMSM0,115200,n8 androidboot.bootdevice=1da4000.ufshc`. → Free boote ses Players de dev **en NFS sur VLAN 41**. Le **cmdline de prod** (`dm=verity/crypt`, root-hash, **clé**) est **injecté par ABL au runtime** → **il faut reverser ABL** pour le schéma de clé (Phase A).
+- 🔌 **UART = `ttyMSM0` @ `115200` 8n1** (base `0xc1b0000`) — **param exact pour la capture UART** (Eric / TP5-7).
+- 💡 Le rootfs **sur le flash** = squashfs + verity (+ crypt ICE) ; l'image **OTA** est chiffrée séparément (SKRY/heh). Un **dump flash** (UART/EDL) pourrait donner le rootfs déchiffré par l'ICE au runtime — à confirmer.
+
 ### À exploiter (offline, sans hardware)
-- [ ] Lire le **patch kernel** : config de boot (cmdline), montage dm-verity/crypt (`init/do_mounts_dm.c`), d'où vient la clé verity/heh (cmdline ? TZ ?).
+- [x] ~~Cmdline/montage dm-verity~~ → fait (cf. ci-dessus). Paramètres de prod = dans ABL.
 - [ ] **CVE locales kernel 4.4.302** (EOL) → utiles SI on obtient un jour du code natif en userland.
 - [ ] `fbxserial` : format du blob device (où sont stockées les clés/identité).
 - [ ] Récupérer les **autres lignes** floss (`freebox_server_delta`, versions plus récentes) pour un kernel plus proche de 1.5.24.
