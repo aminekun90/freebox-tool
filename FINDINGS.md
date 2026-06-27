@@ -308,7 +308,17 @@ Pipeline **Ghidra headless** opérationnel (`scripts/ghidra/`, scripts Java car 
 - **`FUN_0001149c`** (handler de commande, réf. la string `is_unlocked` @ `0x498c6`) : trustlet **QSEE/TrustZone** (`qsee_log`, `qsee_err_fatal`). Vérifie l'état, refuse si déjà provisionné (`*pcVar10==1`), puis **copie un blob de `0x30` octets** (token/clé) — bornes et guards d'overflow présents. = **commande d'unlock/provisioning authentifiée**.
 - → **Mécanisme complet** : unlock = blow du fuse QFPROM via une **commande TZ + token signé OEM** (0x30 o). **Pas de soft-unlock** sans la clé OEM. Restent : **bug mémoire** dans la chaîne (parser de `FUN_0001149c` ou vérif amont, comp02), ou **glitch/EDL hardware**.
 
-Scripts : `FindAndDecompileJava.java` (string→xrefs→décompile), `DecompileAt.java` (fonction @ adresse). Usage : `analyzeHeadless <proj> n -import comp11_*.elf -processor ARM:LE:32:v8 -scriptPath scripts/ghidra -postScript FindAndDecompileJava.java is_unlocked -deleteProject`.
+Scripts : `FindAndDecompileJava.java` (string→xrefs→décompile), `DecompileAt.java` (fonction @ adresse). Usage : `analyzeHeadless <proj> n -import comp11_*.elf -processor ARM:LE:32:v8 -scriptPath scripts/ghidra -postScript FindAndDecompileJava.java is_unlocked -deleteProject` (AArch64 : omettre `-processor`, auto-détecté).
+
+### 🔬 Décompilation comp02 (AArch64) — vérif signature
+- **`FUN_1c07b9e4`** (`entering VerifySignature`) : ne traite que **RSA** (key type 0, sinon rejet), charge exp/mod, puis appelle **`ce_rsa_verify_signature`** = **vérif RSA par le moteur crypto matériel** (Qualcomm CE). Signature/data à offsets fixes (`+0x1a2`/`+0x1d6`/`+0x30`/`+0x38`). **Stack canary** présent, fonction propre.
+- → **Cœur de vérif robuste (RSA HW)**, pas de faille évidente. La surface de bug réaliste = **parsers amont** (X.509/ASN.1, en-têtes d'image/cert) qui remplissent ces champs.
+
+### Conclusion du fil reverse secure-boot (honnête)
+Chaîne de confiance **solide de bout en bout** : vérif RSA HW + lock par **fuse QFPROM** + unlock par **token signé OEM**. **Aucun chemin software trivial.** Les seules ouvertures restantes (toutes lourdes) :
+1. **Bug mémoire dans un parser** de la chaîne (X.509/ASN.1, headers d'image) — exploit-dev profond (Ghidra, semaines).
+2. **Hardware** : glitch (voltage/EM) du fuse-check ou de la vérif, **EDL/Sahara**, **UART** (`ttyMSM0@115200`), **GPIO bank0**.
+Le pipeline Ghidra est en place pour (1) ; (2) attend l'ouverture du boîtier (Eric).
 
 ### Cible offline riche (Phase 4) — prep Ghidra faite
 La chaîne de boot en clair est extraite et cartographiée. Cibles Ghidra prioritaires :
