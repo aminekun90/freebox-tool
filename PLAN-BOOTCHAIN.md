@@ -20,6 +20,16 @@
 - [ ] Parser le conteneur `BOOTCHN` (header `424f4f54 43484e00` = "BOOTCHN") → table des sous-images (xbl, abl, hyp, tz, devcfg, cmnlib, bank0…).
 - [ ] `binwalk -e` + carve manuel par offset. Isoler **ABL** (le bootloader UEFI Android) et **XBL/SBL1**.
 
+### A1bis. Composants déjà extraits (prep faite)
+14 ELF carvés dans `firmware/bootchain/` (gitignoré), via program-headers. Cibles :
+| Fichier | Bits | Base load | Contient | Adresses utiles |
+|-|-|-|-|-|
+| `comp11_0x5c5000_32bit.elf` | ARM32 | PT_LOAD `0x0` | **`is_unlocked`** | string @ vaddr **`0x398c6`** → chercher xrefs (ADR Thumb) = fonction de lecture lock-state |
+| `comp02_0x29c000_64bit.elf` | AArch64 | (cf. phdr) | **`VerifySignature`, `oem_pk_hash`, `macchiato`** | logique de vérif signature |
+| `comp00_0x6000_64bit.elf` | AArch64 | (cf. phdr) | **`sahara`** (XBL) | surface EDL |
+
+**Import Ghidra** : ouvrir le `.elf` directement (Ghidra lit les program headers ; ELF stripped sans sections → désassemblage via segments PT_LOAD). Langage : `ARM:LE:32:v8` (comp11) / `AARCH64:LE:64:v8` (comp02/00). Puis *Search → For Strings* → `is_unlocked` / `VerifySignature` → *References to* → remonter à la fonction.
+
 ### A2. Désassembler ABL (Ghidra)
 - [ ] Charger ABL (ELF AArch64) dans **Ghidra**. C'est un module **UEFI** (PE/TE sections possibles).
 - [ ] Cibler :
