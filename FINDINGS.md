@@ -278,11 +278,21 @@ Capture transparente (Mac = vraie passerelle via Partage Internet, **pas de MITM
 - **boot0+bank0** : conteneur **`BOOTCHN`**, **non chiffré** → binwalk voit des dizaines d'ELF ARM64. Composants : **XBL/SBL1, ABL (UEFI), HYP, cmnlib, DevCfg, Sahara** + **AVB** (`avb+`). Build paths Qualcomm `Msm8998Pkg` (dev `rawoul`).
 - **Banking A/B** : `bank0` peut être **forcé par GPIO** (`bank0 boot is forced`, `bank0 boot gpio active`) → **test point hardware de recovery** à identifier (recoupe la voie UART/EDL).
 
+### Analyse secure-boot (1ère passe strings sur boot0+bank0)
+Chaîne de confiance Qualcomm **complète et durcie** :
+- **Vérif signature à chaque étage** : `ce_rsa_verify_signature`, `km_ecdsa_verify`, `qsee_rsa_verify_signature`, `VerifySignature` ; messages `DTB/kernel signature check failed`, `bad signature on GPT`.
+- **Anti-rollback** : `/secboot/anti_rollback`, `KM_TAG_ROLLBACK_RESISTANT` → pas de downgrade vers firmware vulnérable.
+- **Racine de confiance en fuses** : `macchiato_read_oem_pk_hash()` (hash clé OEM verified-boot), `QFPROM_CHIP_ID`, `pam_qfprom_rail` → clé OEM + état ancrés en **QFPROM (OTP)**.
+- **État de verrouillage** : `is_unlocked: %u` lu via `CRI_CM_IOC_READ_DEVICE_INFO` (device-info custom). **Aucune commande `fastboot oem unlock`** → Free **n'expose PAS de déverrouillage** (pas de fastboot user).
+- **`macchiato_*`** = service Qualcomm de provisioning/attestation de clés ECC.
+
+→ **Verdict** : pas de soft-unlock. Bypass bootloader réaliste = **bug mémoire dans le parsing ABL/XBL** (Ghidra) **ou** EDL/Sahara hardware. Conforme à `ATTACK-ROADMAP.md`.
+
 ### Cible offline riche (Phase 4)
 
 La chaîne de boot en clair (ABL/XBL/HYP) est le terrain de l'analyse secure-boot :
 
-- [ ] Désassembler **ABL** (Ghidra) : parsing fastboot/commandes, vérif signature, `unlock`.
+- [ ] Désassembler **ABL** (Ghidra) : autour de `is_unlocked` / `VerifySignature` / parsing d'images — chercher un bug mémoire exploitable.
 - [ ] **XBL/SBL1 + Sahara** : recoupe l'angle EDL (firehose) de `ATTACK-ROADMAP.md`.
 - [ ] Trouver la **dérivation de clé** du rootfs (probable TZ → non extractible offline, mais comprendre le schéma).
 - [ ] Localiser le **GPIO bank0-forced** → recovery hardware.
