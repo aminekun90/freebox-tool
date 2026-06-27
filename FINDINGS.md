@@ -453,7 +453,8 @@ UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch d
 - Harnais black-box opérationnel (mutations RTSP/SDP/Content-Length/format-string, mode fire-and-forget ~44 cas/s, détection crash par liveness).
 - 1er run RTSP 5000 : 2 "crashes" détectés → **faux positifs** (liveness time-out sous la charge du fuzzing). **Rejeu isolé → daemon vivant** : pas de vrai crash. Le **format-string `%n%n%s` est géré** (pas de bug).
 - **Détecteur durci** : ne loggue un crash que s'il **re-tue le daemon en rejeu isolé** (anti faux-positif de charge).
-- **Verdict provisoire** : parser RAOP **robuste** sur ce premier passage. Un vrai résultat demanderait une **campagne longue** (≫30k cas) + mutations **grammar-aware** (SDP/plist), et idéalement le binaire (hors d'atteinte, chiffré). Surface réelle mais coûteuse.
+- **Verdict (2 passages, ~5000 cas avec détecteur durci)** : **0 crash réel**, Player intact (ping/ports OK). Le parser RAOP **résiste au fuzzing black-box dumb**. `%n` géré, bornes OK.
+- **Conclusion piste AirPlay/RAOP** : surface réelle et non authentifiée, mais **robuste** au fuzzing sans instrumentation. Pour aller plus loin il faudrait : mutations **grammar-aware** (SDP/plist binaires structurés), le **port 7000 (plists AirPlay)** non encore fuzzé, ou le **binaire du daemon** (dans le rootfs chiffré → hors d'atteinte). Coût élevé, ROI incertain. **Pas le quick win espéré.**
 
 ## Annexes
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
