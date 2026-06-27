@@ -96,11 +96,22 @@ python3 scripts/fbx-deploy.py app/probe
 - Documenter chaque étape pour rester réversible (tant qu'on ne flashe rien).
 - Ne committez **jamais** de secrets (tokens API Freebox, clés).
 
-## ⚠️ Réalité connue (honnêteté d'entrée)
+## ⚠️ Verdict (honnête, étayé par le reverse)
 
-- Aucune méthode publique vérifiée pour installer Android sur le Player Delta.
-- Le Player Delta tourne un **OS maison Free** (Linux, runtime QML `fbxqmltv`), ≠ Android TV du Player Pop.
-- **Le matériel n'est PAS le problème** : APQ8098 = Snapdragon 835, Android-natif. Le verrou est **logiciel** (chaîne de boot signée + sandbox app).
-- **Acquis** : exécution de code QML/JS sur le Player via le mode dev officiel (`fbx-deploy.py`).
-- **Mur actuel** : le sandbox QML est hermétique ; l'évasion vers root reste à faire (exploit moteur, ou voie hardware UART/EDL — cf. [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md)).
+**Ce qui est ACQUIS et concret :**
+- ✅ **Exécution de code** sur le Player (mode dev officiel) + outil `fbx-deploy.py`.
+- ✅ **Contrôle réseau** (télécommande `/pub/remote_control`).
+- ✅ **Firmware complet** récupéré (OTA HTTP) ; **chaîne de boot en clair décompilée** (Ghidra).
+- ✅ **Modèle de sécurité entièrement compris** (preuve par le code).
+
+**Ce qui est un CUL-DE-SAC software (pour root/Android) :**
+- Le secure-boot est **verrouillé dans le silicium** : vérif **RSA matérielle**, état de lock = **fuse QFPROM** (OTP irréversible), unlock = **token signé OEM** (clé détenue par Free seul).
+- **Aucun soft-unlock n'existe** — fermeture *architecturale*, pas un manque de recherche.
+- Le **sandbox QML** est hermétique ; le **système (rootfs) est chiffré** (AES-HEH + dm-verity).
+
+**Les seules portes restantes (toutes lourdes, non-software) :**
+1. **Bug mémoire** dans un parser de la chaîne de boot (X.509/ASN.1, headers) → exploit-dev de semaines, incertain. Pipeline Ghidra prêt (`scripts/ghidra/`).
+2. **Hardware** : glitch (fault injection), **EDL/Sahara**, **UART `ttyMSM0@115200`**, **GPIO bank0** → cf. [`ATTACK-ROADMAP.md`](./ATTACK-ROADMAP.md) et [`PLAN-BOOTCHAIN.md`](./PLAN-BOOTCHAIN.md).
+
+> Conclusion : comme tout Snapdragon moderne verrouillé (équivalent iPhone), **sans faille hardware ou 0-day bootloader, pas de root**. Ce dépôt documente tout le chemin et fournit les outils pour qui veut creuser (1) ou (2).
 </content>
