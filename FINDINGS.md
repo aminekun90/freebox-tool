@@ -449,6 +449,12 @@ UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch d
 **Sondage (2026-06-27)** : RTSP 5000 répond **sans auth** à `OPTIONS/ANNOUNCE/SETUP/RECORD/SET_PARAMETER/...` → **surface de parsing non authentifiée** (SDP, plist binaire, RTP, décodeur ALAC). AirPlay 7000 : `/server-info` 200, `/playback-info` 500 constant (état "no session"). 
 - **Limite** : le binaire du daemon est dans le **rootfs chiffré** → pas de reverse offline. Exploitation = **fuzzing black-box** du device (ANNOUNCE/SETUP/plist) ou CVE RAOP/shairport proche de `220.68`. Effort réel, pas un quick win, mais **c'est la meilleure surface software non-bootloader restante**.
 
+**Fuzzing — 1ère campagne (2026-06-27, `scripts/airplay-fuzz.py`)** :
+- Harnais black-box opérationnel (mutations RTSP/SDP/Content-Length/format-string, mode fire-and-forget ~44 cas/s, détection crash par liveness).
+- 1er run RTSP 5000 : 2 "crashes" détectés → **faux positifs** (liveness time-out sous la charge du fuzzing). **Rejeu isolé → daemon vivant** : pas de vrai crash. Le **format-string `%n%n%s` est géré** (pas de bug).
+- **Détecteur durci** : ne loggue un crash que s'il **re-tue le daemon en rejeu isolé** (anti faux-positif de charge).
+- **Verdict provisoire** : parser RAOP **robuste** sur ce premier passage. Un vrai résultat demanderait une **campagne longue** (≫30k cas) + mutations **grammar-aware** (SDP/plist), et idéalement le binaire (hors d'atteinte, chiffré). Surface réelle mais coûteuse.
+
 ## Annexes
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
 - [freebox_player_codes](https://dev.freebox.fr/sdk/freebox_player_codes.html) — codes touches télécommande réseau.
