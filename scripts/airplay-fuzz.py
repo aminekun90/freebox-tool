@@ -27,18 +27,18 @@ def find_player():
             if m: return m.group(1)
     return None
 
-def send_raw(ip, port, data, timeout=4):
-    """Envoie data, renvoie (ok, reponse|err)."""
+def send_raw(ip, port, data, timeout=2, read=True):
+    """Envoie data. Si read=False : fire-and-forget (débit max pour le fuzzing)."""
     try:
         s = socket.create_connection((ip, port), timeout=timeout)
         s.sendall(data)
+        if not read:
+            s.close()
+            return True, b""
         s.settimeout(timeout)
         resp = b""
         try:
-            while len(resp) < 4096:
-                chunk = s.recv(1024)
-                if not chunk: break
-                resp += chunk
+            resp = s.recv(2048)
         except socket.timeout:
             pass
         s.close()
@@ -117,7 +117,7 @@ def main():
     crashes = 0
     for i in range(args.n):
         case = mutate(rng.choice(base), rng)
-        send_raw(ip, args.port, case)
+        send_raw(ip, args.port, case, read=False)   # fire-and-forget
         if i % 25 == 0:                       # liveness périodique
             if not alive(ip, args.port):
                 # confirmer (vrai crash vs timeout transitoire)
