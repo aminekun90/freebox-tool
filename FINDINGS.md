@@ -302,6 +302,14 @@ Chaîne de confiance Qualcomm **complète et durcie** :
 
 Pas de composant tagué `fastboot`/`avb_` → **pas de fastboot user** (confirmé).
 
+### 🔬 Décompilation Ghidra (comp11, ARM32) — mécanisme d'unlock élucidé
+Pipeline **Ghidra headless** opérationnel (`scripts/ghidra/`, scripts Java car Ghidra 12 = pas de Jython).
+- **`FUN_0003b904`** (source de l'état) : appelle **`qsee_is_sw_fuse_blown(1,…)`** → **l'état `is_unlocked` = un fuse OTP QFPROM** (fuse #1). Blown=déverrouillé, sinon verrouillé. Hardware, irréversible.
+- **`FUN_0001149c`** (handler de commande, réf. la string `is_unlocked` @ `0x498c6`) : trustlet **QSEE/TrustZone** (`qsee_log`, `qsee_err_fatal`). Vérifie l'état, refuse si déjà provisionné (`*pcVar10==1`), puis **copie un blob de `0x30` octets** (token/clé) — bornes et guards d'overflow présents. = **commande d'unlock/provisioning authentifiée**.
+- → **Mécanisme complet** : unlock = blow du fuse QFPROM via une **commande TZ + token signé OEM** (0x30 o). **Pas de soft-unlock** sans la clé OEM. Restent : **bug mémoire** dans la chaîne (parser de `FUN_0001149c` ou vérif amont, comp02), ou **glitch/EDL hardware**.
+
+Scripts : `FindAndDecompileJava.java` (string→xrefs→décompile), `DecompileAt.java` (fonction @ adresse). Usage : `analyzeHeadless <proj> n -import comp11_*.elf -processor ARM:LE:32:v8 -scriptPath scripts/ghidra -postScript FindAndDecompileJava.java is_unlocked -deleteProject`.
+
 ### Cible offline riche (Phase 4) — prep Ghidra faite
 La chaîne de boot en clair est extraite et cartographiée. Cibles Ghidra prioritaires :
 
