@@ -361,11 +361,16 @@ Devenir la **vraie passerelle** du Player (pas de spoof) → aucune anomalie dé
 3. Fuzzer RTSP 554 (`Freebox rtspd 1.2`) — surface custom, potentiel parsing bug.
 4. Chercher CVE/exploits RAOP `srcvers 220.68` (récepteur AirPlay legacy).
 5. Hardware : repérer un **UART/console série** sur la carte (repli si réseau = cul-de-sac).
-</content>
 
-</invoke>
+## 🎛️ Namespace HTTP `/pub/*` du Player + télécommande réseau
+Le Player expose un namespace `/pub/` (port 80). Énuméré sur le device (~40 candidats) :
+- **`/pub/devel`** → 200 (JSON-RPC mode dev, cf. plus haut).
+- **`/pub/remote_control`** → 403 sans code. **API télécommande réseau** : `GET /pub/remote_control?code=<CODE>&key=<KEY>` (code dans réglages Player ; codes touches : [dev.freebox.fr/sdk/freebox_player_codes.html](https://dev.freebox.fr/sdk/freebox_player_codes.html)).
+- Tout le reste (`system/status/api/update/reboot/exec/shell/…`) → 404.
+
+→ La télécommande réseau permet d'**injecter des touches** (navigation, lancement Netflix/YouTube, on/off) — **utile pour automatiser**, mais **pas un vecteur d'escalade**. Réf. plugin [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) (détection ON/OFF via AirPlay:7000 ou UPnP:54243).
 
 ## Annexes
-
-- [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta)
-- [CVE - Qualcomm](https://www.cvedetails.com/vulnerability-list/vendor_id-153/Qualcomm.html)
+- [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
+- [freebox_player_codes](https://dev.freebox.fr/sdk/freebox_player_codes.html) — codes touches télécommande réseau.
+- [CVE - Qualcomm](https://www.cvedetails.com/vulnerability-list/vendor_id-153/Qualcomm.html) — pour l'angle bootloader/EDL.
