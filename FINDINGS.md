@@ -428,6 +428,24 @@ Le Player expose un namespace `/pub/` (port 80). Énuméré sur le device (~40 c
 - **Sans root** : seul le **débranchement** coupe LED + conso.
 - 🎯 **Objectif root concret & motivant** : piloter **`fbxgpio` / le PSoC façade** pour **éteindre la LED** (et idéalement booter un OS qui ne cherche pas d'appairage). Cas d'usage réel qui justifie le jailbreak au-delà d'Android.
 
+## 🧭 Pistes restantes — carte honnête (2026-06-27)
+Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste**, classé par réalisme.
+
+### Software (sur le device, sans ouvrir le boîtier)
+| Piste | État | Potentiel | Effort |
+|-|-|-|-|
+| **AirPlay/RAOP RCE** (daemon réseau on-device, `srcvers 220.68` legacy, `/playback-info` → **500**) | **JAMAIS exploré** | Foothold dans un **process système** (sandbox ≠ QML, peut-être plus faible) | moyen (fuzz/CVE) |
+| **RTSP 554 `Freebox rtspd 1.2`** | non fuzzé | parser custom Free | moyen |
+| **Bug parser chaîne de boot** (X.509/ASN.1, headers d'image) dans comp00/comp02 | pipeline Ghidra prêt | LE bypass secure-boot software | **élevé** (semaines) |
+| **Sahara 0x13** (`XBLRamDumpLib/sbl1_sahara.c`, comp00) | décompilable | si vulnérable → EDL sans loader signé | élevé (analyse automate) |
+| **Exploit moteur Qt 5.8 / WebKit 16.4** | écarté (dur, WASM off) | évasion sandbox QML/navigateur | très élevé |
+
+### Hardware (ouvrir le boîtier — Eric)
+UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch du fuse-check/vérif RSA. Cf. `ERIC-HARDWARE-BRIEF.md`.
+
+### La plus prometteuse non encore tentée
+👉 **AirPlay/RAOP** : c'est un **service réseau qui tourne sur le Player**, en **AirPlay 1 legacy** (pas de pairing/FairPlay), avec un endpoint qui **plante déjà** (`/playback-info` 500). Un bug mémoire y donnerait du **code exec dans un daemon système** — potentiellement **hors du sandbox QML**. Prochaine exploration logicielle naturelle (chercher CVE RAOP/shairport proches de 220.68, ou fuzzer le parsing RTSP/plist).
+
 ## Annexes
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
 - [freebox_player_codes](https://dev.freebox.fr/sdk/freebox_player_codes.html) — codes touches télécommande réseau.
