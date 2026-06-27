@@ -402,6 +402,14 @@ Le Player expose un namespace `/pub/` (port 80). Énuméré sur le device (~40 c
 
 → La télécommande réseau permet d'**injecter des touches** (navigation, lancement Netflix/YouTube, on/off) — **utile pour automatiser**, mais **pas un vecteur d'escalade**. Réf. plugin [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) (détection ON/OFF via AirPlay:7000 ou UPnP:54243).
 
+**Capacité confirmée** (2026-06-27) : avec le **code télécommande réseau** (réglages Player ; *non commité* — secret), `GET /pub/remote_control?code=<CODE>&key=<KEY>` → **HTTP 200**, on pilote le Player (testé `vol_inc`, `power`). Réutilisable pour automatiser des tests (navigation/apps).
+
+### 🔴 Problème "Player orphelin" + objectif root concret
+- Ligne Free **résiliée** + Player Devialet **non rattachable** à la box actuelle (Pop ; Free n'autorise que sur Ultra) → le Player reste **orphelin**, **LED façade allumée/clignotante en permanence** (recherche d'appairage), forte conso + pollution lumineuse.
+- La touche réseau **`power` (veille) ne calme PAS la LED** : la LED est pilotée par le **PSoC `fbx7hd-top-psoc` / `fbxgpio`** selon l'état d'appairage, **indépendamment de la veille**. Aucun levier software sans root.
+- **Sans root** : seul le **débranchement** coupe LED + conso.
+- 🎯 **Objectif root concret & motivant** : piloter **`fbxgpio` / le PSoC façade** pour **éteindre la LED** (et idéalement booter un OS qui ne cherche pas d'appairage). Cas d'usage réel qui justifie le jailbreak au-delà d'Android.
+
 ## Annexes
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
 - [freebox_player_codes](https://dev.freebox.fr/sdk/freebox_player_codes.html) — codes touches télécommande réseau.
