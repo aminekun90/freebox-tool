@@ -444,7 +444,10 @@ Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste*
 UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch du fuse-check/vérif RSA. Cf. `ERIC-HARDWARE-BRIEF.md`.
 
 ### La plus prometteuse non encore tentée
-👉 **AirPlay/RAOP** : c'est un **service réseau qui tourne sur le Player**, en **AirPlay 1 legacy** (pas de pairing/FairPlay), avec un endpoint qui **plante déjà** (`/playback-info` 500). Un bug mémoire y donnerait du **code exec dans un daemon système** — potentiellement **hors du sandbox QML**. Prochaine exploration logicielle naturelle (chercher CVE RAOP/shairport proches de 220.68, ou fuzzer le parsing RTSP/plist).
+👉 **AirPlay/RAOP** : **service réseau on-device**, **AirPlay 1 legacy** (pas de pairing/FairPlay), endpoint qui **plante** (`/playback-info` 500). Un bug mémoire = **code exec dans un daemon système**, potentiellement **hors sandbox QML**.
+
+**Sondage (2026-06-27)** : RTSP 5000 répond **sans auth** à `OPTIONS/ANNOUNCE/SETUP/RECORD/SET_PARAMETER/...` → **surface de parsing non authentifiée** (SDP, plist binaire, RTP, décodeur ALAC). AirPlay 7000 : `/server-info` 200, `/playback-info` 500 constant (état "no session"). 
+- **Limite** : le binaire du daemon est dans le **rootfs chiffré** → pas de reverse offline. Exploitation = **fuzzing black-box** du device (ANNOUNCE/SETUP/plist) ou CVE RAOP/shairport proche de `220.68`. Effort réel, pas un quick win, mais **c'est la meilleure surface software non-bootloader restante**.
 
 ## Annexes
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
