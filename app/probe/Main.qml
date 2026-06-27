@@ -4,35 +4,34 @@ import fbx.application 1.0
 Application {
     id: app
     property string log: ""
-    function p(s) { console.log(s); log = (log + s + "\n").split("\n").slice(-28).join("\n"); }
-
-    // Hook framework : que nous envoie le système ?
-    function handleUrl(url) { p("handleUrl() RECU: " + url); return true; }
+    function p(s) { console.log(s); log = (log + s + "\n").split("\n").slice(-30).join("\n"); }
 
     Rectangle {
         anchors.fill: parent; color: "#101018"
-        Text { anchors.fill: parent; anchors.margins: 18
-            color: "#33ff66"; font.pixelSize: 16; font.family: "monospace"
+        Text { anchors.fill: parent; anchors.margins: 16
+            color: "#33ff66"; font.pixelSize: 14; font.family: "monospace"
             text: app.log; wrapMode: Text.WrapAnywhere }
     }
 
     Component.onCompleted: {
-        p("===== openUrlExternally PROBE =====");
-        var base = Qt.resolvedUrl("manifest.json").replace("manifest.json", "");
-        // Si un navigateur/handler système s'ouvre, notre serveur HTTP verra ces GET :
-        var tests = [
-            base + "OPENURL_HTTP",                 // http vers nous (observable)
-            "file:///etc/passwd",
-            "fbx://app/OPENURL_FBX",
-            "fbxapp://OPENURL_SCHEME",
-            "http://127.0.0.1/OPENURL_LOOPBACK"
-        ];
-        for (var i = 0; i < tests.length; i++) {
-            try {
-                var r = Qt.openUrlExternally(tests[i]);
-                p("openUrlExternally(" + tests[i].substring(0,40) + ") = " + r);
-            } catch(e) { p("ERR " + e); }
+        p("===== LED / ASSOC / SYSTEM PROBE =====");
+        // toutes les clés de Application filtrées sur mots-clés intéressants
+        var kw = ["led","light","power","standby","sleep","assoc","pair","provision",
+                  "server","fbx","system","reboot","shutdown","state","gpio","brightness",
+                  "register","activate","console","device","mode","status"];
+        var all = []; for (var k in app) all.push(k);
+        var hits = all.filter(function(k){
+            var lk = k.toLowerCase();
+            return kw.some(function(w){ return lk.indexOf(w) >= 0; });
+        });
+        p("Application props/méthodes pertinentes (" + hits.length + "):");
+        p(hits.join(" "));
+
+        // typeof de chaque hit (méthode vs propriété)
+        for (var i = 0; i < hits.length; i++) {
+            try { p("  " + hits[i] + " : " + (typeof app[hits[i]]) + " = " +
+                    String(app[hits[i]]).slice(0,40)); } catch(e){}
         }
-        p("===== END (watch HTTP log for OPENURL_*) =====");
+        p("===== END =====");
     }
 }

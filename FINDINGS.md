@@ -428,6 +428,12 @@ Le Player expose un namespace `/pub/` (port 80). Énuméré sur le device (~40 c
 - **Sans root** : seul le **débranchement** coupe LED + conso.
 - 🎯 **Objectif root concret & motivant** : piloter **`fbxgpio` / le PSoC façade** pour **éteindre la LED** (et idéalement booter un OS qui ne cherche pas d'appairage). Cas d'usage réel qui justifie le jailbreak au-delà d'Android.
 
+### Vérifications "contrôle LED" et "simuler l'association" (2026-06-27)
+- **LED contrôlable par l'app ?** **Non** — introspection de `Application` : seulement window-level + `consoleState`/`appState`, **aucune** API led/power/gpio/system. Communauté confirme : LED non désactivable sans root ([toosurtoo](https://freebox.toosurtoo.com/forum/player-devialet/tuto-utiliser-le-player-devialet-sans-connexion-t23337.html)).
+- **Simuler l'association Player↔Server ?** Le clignotement = état **« recherche serveur »**. Protocole **propriétaire + authentifié** (Server authentifie le Player via clés `fbxserial`) → émuler = reverser un protocole authentifié, **lourd et probablement crypto-gated**. Aucune méthode publique.
+- **Acquis utile** : le Player orphelin **reste fonctionnel** en standalone (Netflix/Deezer/Alexa/Bluetooth) sur un réseau tiers ; seule la LED reste allumée (cosmétique).
+- → Les deux idées butent sur **root** (LED) ou un **gros reverse crypto** (association). Pas de quick win.
+
 ## 🧭 Pistes restantes — carte honnête (2026-06-27)
 Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste**, classé par réalisme.
 
