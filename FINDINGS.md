@@ -288,11 +288,26 @@ Chaîne de confiance Qualcomm **complète et durcie** :
 
 → **Verdict** : pas de soft-unlock. Bypass bootloader réaliste = **bug mémoire dans le parsing ABL/XBL** (Ghidra) **ou** EDL/Sahara hardware. Conforme à `ATTACK-ROADMAP.md`.
 
-### Cible offline riche (Phase 4)
+### Carte des composants de la chaîne de boot (extraits de `boot0+bank0`)
+14 ELF carvés (program-headers) dans `firmware/bootchain/` (gitignoré). Étiquetés par strings :
+| Comp | Offset | Bits | Taille | Rôle |
+|-|-|-|-|-|
+| **00** | `0x6000` | 64 | 2.6 Mo | **XBL/SBL1** (`sahara` → EDL) |
+| 01 | `0x23c060` | 64 | 75 Ko | — |
+| **02** | `0x29c000` | 64 | 1.9 Mo | ⭐ **Vérif signature** (`VerifySignature`, `oem_pk_hash`, `macchiato`) |
+| 04 | `0x48a000` | 64 | 265 Ko | — |
+| **06** | `0x4da000` | 64 | 56 Ko | **Keymaster** (TZ) |
+| **11** | `0x5c5000` | 32 | 335 Ko | ⭐ **État unlock** (`is_unlocked`, keymaster) |
+| 13 | `0x629000` | 64 | 173 Ko | — |
 
-La chaîne de boot en clair (ABL/XBL/HYP) est le terrain de l'analyse secure-boot :
+Pas de composant tagué `fastboot`/`avb_` → **pas de fastboot user** (confirmé).
 
-- [ ] Désassembler **ABL** (Ghidra) : autour de `is_unlocked` / `VerifySignature` / parsing d'images — chercher un bug mémoire exploitable.
+### Cible offline riche (Phase 4) — prep Ghidra faite
+La chaîne de boot en clair est extraite et cartographiée. Cibles Ghidra prioritaires :
+
+- [ ] **comp02** (`0x29c000`, 64-bit) : logique `VerifySignature` + `oem_pk_hash` + `macchiato` → chercher un **bug de parsing** dans la vérif de signature.
+- [ ] **comp11** (`0x5c5000`, 32-bit) : fonction lisant `is_unlocked` (`CRI_CM_IOC_READ_DEVICE_INFO`) → comprendre la source de l'état, chercher un contournement.
+- [ ] **comp00** (`0x6000`, XBL/Sahara) : surface EDL (recoupe `ATTACK-ROADMAP.md`).
 - [ ] **XBL/SBL1 + Sahara** : recoupe l'angle EDL (firehose) de `ATTACK-ROADMAP.md`.
 - [ ] Trouver la **dérivation de clé** du rootfs (probable TZ → non extractible offline, mais comprendre le schéma).
 - [ ] Localiser le **GPIO bank0-forced** → recovery hardware.
