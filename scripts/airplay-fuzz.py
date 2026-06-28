@@ -12,7 +12,14 @@ sauve le reproducteur exact, puis attend la reprise du service.
 Usage : python3 scripts/airplay-fuzz.py [--player IP] [--port 5000|7000] [-n N] [--seed S]
 Matériel possédé, recherche sécurité. Le Player orphelin peut crasher/redémarrer le daemon.
 """
-import argparse, random, socket, subprocess, re, sys, time, os
+import argparse
+import os
+import random
+import re
+import socket
+import subprocess
+import sys
+import time
 
 PLAYER_MAC = "34:27:92:8e:f3:38"
 OUTDIR = os.path.join(os.path.dirname(__file__), "..", "firmware", "fuzz-crashes")

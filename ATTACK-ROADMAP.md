@@ -31,6 +31,7 @@ Le Player annonce un service mDNS `_fbx-devel._tcp` nommé **"Remote debugger"**
 **C'est de l'exécution de code légale et non-invasive, sans toucher au bootloader.** Apps Qt = C++ compilé → si le sandbox autorise du natif, base pour explorer le FS et tenter une élévation vers root. À traiter **avant** l'EDL/hardware.
 
 Étapes :
+
 1. Activer le mode dev sur le Player.
 2. Re-résoudre `_fbx-devel._tcp` → noter le port réel + fingerprint (gdbserver ?).
 3. QtCreator + plugin Freebox + lib QML `fbx` → déployer une app test.
@@ -53,9 +54,11 @@ Obtenir un accès bas-niveau ?
 ## Tâches ouvertes (par coût croissant, toutes légales sur matériel possédé)
 
 ### Tier 0 — Pure recherche doc (aucun hardware requis)
+
 - [x] ~~**Chercher un dump firmware public du Player.**~~ → **Inexistant.** Consensus communautaire ([forum univers­freebox](https://forum.universfreebox.com/viewtopic.php?t=78584)) : extraction infaisable sans JTAG. Pas de récupération USB ([FS#29071](https://dev.freebox.fr/bugs/task/29071), Free : « pas possible du tout »). Firmware **authentifié par MAC**, servi **par device enregistré** → pas téléchargeable librement.
 
 ### Tier 0bis — Capture du canal OTA (sur SON propre Player, légal) ⭐ DERNIÈRE PISTE SOFTWARE PROPRE
+
 Puisque le firmware est servi **au Player** après auth MAC, le device le télécharge lui-même.
 On peut donc l'**intercepter sur son propre réseau** — seul moyen non-invasif d'obtenir le binaire.
 
@@ -72,6 +75,7 @@ On peut donc l'**intercepter sur son propre réseau** — seul moyen non-invasif
 > Script de capture fourni : `scripts/capture-ota.sh` (détecte le Player par MAC, trap de nettoyage). **Mais** sa version ARP-spoof déclenche le bip — à adapter pour une capture transparente.
 
 #### Runbook — capture transparente via Partage Internet macOS (à exécuter)
+
 Méthode validée comme la bonne (pas de spoof, pas de bip). Prérequis : **1 adaptateur USB-Ethernet**.
 
 Montage : `[Player] --Eth--> [USB-Eth] --> [Mac] --WiFi--> [Freebox → Internet]`
@@ -83,32 +87,40 @@ Montage : `[Player] --Eth--> [USB-Eth] --> [Mac] --WiFi--> [Freebox → Internet
    - Activer **Partage Internet**.
 3. Brancher le **Player** sur l'adaptateur → le Mac est sa passerelle DHCP/NAT légitime.
 4. Identifier l'iface du Player (côté pont, souvent `bridge100` ou l'`enX` partagé) :
+
    ```bash
    ifconfig bridge100 2>/dev/null      # le Player apparaît dans le subnet 192.168.2.x
    arp -an | grep -i 34:27:92:8e:f3:38  # confirmer son IP côté pont
    ```
+
 5. Capturer (pas de sudo-spoof, juste tcpdump sur l'iface qui voit le Player) :
+
    ```bash
    sudo tcpdump -i bridge100 -nn -s0 -U -w ota-capture.pcap host <ip_player_cote_pont>
    ```
+
 6. Pendant la capture : laisser le Player s'activer / power-cycle pour forcer le check OTA.
 7. Analyser : `tcpdump -r ota-capture.pcap -nn 'port 53'` (hostnames) puis `binwalk` sur toute image récupérée.
 
 Avantage bonus : le Mac voyant **tout** le trafic en clair au niveau IP, on peut aussi router vers **mitmproxy** (`mitmproxy --mode transparent`) pour inspecter le HTTP(S) non-pinné.
+
 - [ ] **Identifier le hardware-ID / MSM-ID exact** du board (utile pour matcher un firehose). Visible via Sahara hello en EDL, ou dans le firmware.
 - [ ] **Recenser les firehose MSM8998 publics** (autres devices SD835) et tester s'ils passent — improbable si QFuse blown, mais certains boards de prod ont le secure boot non verrouillé. Liste : [XDA firehose loaders](https://xdaforums.com/t/identifying-edl-firehose-loaders.4525079/).
 - [ ] **Veille CVE chaîne de boot MSM8998** : XBL/ABL/LK, anti-rollback, Sahara. Réévaluer [CVE-2021-1931](https://xdaforums.com/t/xz1c-xz1-xzp-xperable-xperia-abl-fastboot-exploit-cve-2021-1931.4771931/) (Sony-only aujourd'hui) si une surface fastboot apparaît.
 
 ### Tier 1 — Investigation hardware non destructive (besoin du board ouvert)
+
 - [ ] **Repérer l'UART** (TX/RX/GND, souvent 1.8 V) sur la carte. Capturer le log de boot (U-Boot/LK) → révèle bootloader, version, éventuel shell. **Pistes communautaires : test points `TP5`/`TP6`/`TP7`** ([EricBlanquer/freebox-devialet-hack](https://github.com/EricBlanquer/freebox-devialet-hack), adaptateur CP2102). Stockage **UFS** (≠ eMMC) → adapter la méthode de dump physique.
 - [ ] **Repérer les test points EDL** : court-circuiter au GND au boot jusqu'à énumérer `Qualcomm HS-USB 9008`. Documenter leur position (photo annotée).
 - [ ] **Dumper le hello Sahara** avec `edl.py` une fois en 9008 → hardware-ID, PK hash, état secure boot.
 
 ### Tier 2 — Extraction (plus invasif)
+
 - [ ] **Si shell UART root** : `dd` des partitions (`aboot`, `xbl`, `boot`, `system`) → upload pour reverse collectif.
 - [ ] **Sinon ISP eMMC** (pads ISP) ou chip-off en dernier recours → dump complet.
 
 ### Tier 3 — Portage Android (après ouverture du boot)
+
 - [ ] Construire le **device tree** APQ8098 pour ce board (basé sur un device SD835 mainline proche : OnePlus 5 `cheeseburger`, etc.).
 - [ ] Drivers spécifiques : audio Devialet, HDMI, WiFi/BT.
 - [ ] Cibler **LineageOS** ou AOSP minimal, puis Android TV.

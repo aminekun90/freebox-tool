@@ -1,7 +1,9 @@
 *.log
 recon-*.log
 *.pcap
-firmware/
+firmware/*
+!firmware/.gitkeep
+!firmware/readme*
 *.img
 *.bin
 .DS_Store

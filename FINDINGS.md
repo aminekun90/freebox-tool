@@ -279,7 +279,9 @@ Capture transparente (Mac = vraie passerelle via Partage Internet, **pas de MITM
 - **Banking A/B** : `bank0` peut être **forcé par GPIO** (`bank0 boot is forced`, `bank0 boot gpio active`) → **test point hardware de recovery** à identifier (recoupe la voie UART/EDL).
 
 ### Analyse secure-boot (1ère passe strings sur boot0+bank0)
+
 Chaîne de confiance Qualcomm **complète et durcie** :
+
 - **Vérif signature à chaque étage** : `ce_rsa_verify_signature`, `km_ecdsa_verify`, `qsee_rsa_verify_signature`, `VerifySignature` ; messages `DTB/kernel signature check failed`, `bad signature on GPT`.
 - **Anti-rollback** : `/secboot/anti_rollback`, `KM_TAG_ROLLBACK_RESISTANT` → pas de downgrade vers firmware vulnérable.
 - **Racine de confiance en fuses** : `macchiato_read_oem_pk_hash()` (hash clé OEM verified-boot), `QFPROM_CHIP_ID`, `pam_qfprom_rail` → clé OEM + état ancrés en **QFPROM (OTP)**.
@@ -289,7 +291,9 @@ Chaîne de confiance Qualcomm **complète et durcie** :
 → **Verdict** : pas de soft-unlock. Bypass bootloader réaliste = **bug mémoire dans le parsing ABL/XBL** (Ghidra) **ou** EDL/Sahara hardware. Conforme à `ATTACK-ROADMAP.md`.
 
 ### Carte des composants de la chaîne de boot (extraits de `boot0+bank0`)
+
 14 ELF carvés (program-headers) dans `firmware/bootchain/` (gitignoré). Étiquetés par strings :
+
 | Comp | Offset | Bits | Taille | Rôle |
 |-|-|-|-|-|
 | **00** | `0x6000` | 64 | 2.6 Mo | **XBL/SBL1** (`sahara` → EDL) |
@@ -303,7 +307,9 @@ Chaîne de confiance Qualcomm **complète et durcie** :
 Pas de composant tagué `fastboot`/`avb_` → **pas de fastboot user** (confirmé).
 
 ### 🔬 Décompilation Ghidra (comp11, ARM32) — mécanisme d'unlock élucidé
+
 Pipeline **Ghidra headless** opérationnel (`scripts/ghidra/`, scripts Java car Ghidra 12 = pas de Jython).
+
 - **`FUN_0003b904`** (source de l'état) : appelle **`qsee_is_sw_fuse_blown(1,…)`** → **l'état `is_unlocked` = un fuse OTP QFPROM** (fuse #1). Blown=déverrouillé, sinon verrouillé. Hardware, irréversible.
 - **`FUN_0001149c`** (handler de commande, réf. la string `is_unlocked` @ `0x498c6`) : trustlet **QSEE/TrustZone** (`qsee_log`, `qsee_err_fatal`). Vérifie l'état, refuse si déjà provisionné (`*pcVar10==1`), puis **copie un blob de `0x30` octets** (token/clé) — bornes et guards d'overflow présents. = **commande d'unlock/provisioning authentifiée**.
 - → **Mécanisme complet** : unlock = blow du fuse QFPROM via une **commande TZ + token signé OEM** (0x30 o). **Pas de soft-unlock** sans la clé OEM. Restent : **bug mémoire** dans la chaîne (parser de `FUN_0001149c` ou vérif amont, comp02), ou **glitch/EDL hardware**.
@@ -311,16 +317,20 @@ Pipeline **Ghidra headless** opérationnel (`scripts/ghidra/`, scripts Java car 
 Scripts : `FindAndDecompileJava.java` (string→xrefs→décompile), `DecompileAt.java` (fonction @ adresse). Usage : `analyzeHeadless <proj> n -import comp11_*.elf -processor ARM:LE:32:v8 -scriptPath scripts/ghidra -postScript FindAndDecompileJava.java is_unlocked -deleteProject` (AArch64 : omettre `-processor`, auto-détecté).
 
 ### 🔬 Décompilation comp02 (AArch64) — vérif signature
+
 - **`FUN_1c07b9e4`** (`entering VerifySignature`) : ne traite que **RSA** (key type 0, sinon rejet), charge exp/mod, puis appelle **`ce_rsa_verify_signature`** = **vérif RSA par le moteur crypto matériel** (Qualcomm CE). Signature/data à offsets fixes (`+0x1a2`/`+0x1d6`/`+0x30`/`+0x38`). **Stack canary** présent, fonction propre.
 - → **Cœur de vérif robuste (RSA HW)**, pas de faille évidente. La surface de bug réaliste = **parsers amont** (X.509/ASN.1, en-têtes d'image/cert) qui remplissent ces champs.
 
 ### Conclusion du fil reverse secure-boot (honnête)
+
 Chaîne de confiance **solide de bout en bout** : vérif RSA HW + lock par **fuse QFPROM** + unlock par **token signé OEM**. **Aucun chemin software trivial.** Les seules ouvertures restantes (toutes lourdes) :
+
 1. **Bug mémoire dans un parser** de la chaîne (X.509/ASN.1, headers d'image) — exploit-dev profond (Ghidra, semaines).
 2. **Hardware** : glitch (voltage/EM) du fuse-check ou de la vérif, **EDL/Sahara**, **UART** (`ttyMSM0@115200`), **GPIO bank0**.
 Le pipeline Ghidra est en place pour (1) ; (2) attend l'ouverture du boîtier (Eric).
 
 ### Cible offline riche (Phase 4) — prep Ghidra faite
+
 La chaîne de boot en clair est extraite et cartographiée. Cibles Ghidra prioritaires :
 
 - [ ] **comp02** (`0x29c000`, 64-bit) : logique `VerifySignature` + `oem_pk_hash` + `macchiato` → chercher un **bug de parsing** dans la vérif de signature.
@@ -331,9 +341,11 @@ La chaîne de boot en clair est extraite et cartographiée. Cibles Ghidra priori
 - [ ] Localiser le **GPIO bank0-forced** → recovery hardware.
 
 ## 📚 Sources GPL — [floss.freebox.fr](https://floss.freebox.fr) (`freebox_player_delta/1.5.3`)
+
 Portail de conformité GPL de Free. Seules les **parties open-source** sont publiées (pas de bootloader proprio, pas de runtime `fbxqmltv`, pas de clés). Version la plus proche de notre 1.5.24.2 = **`freebox_player_delta/1.5.3`**. Patch kernel récupéré en local (`firmware/gpl/`, gitignoré).
 
 ### Acquis structurants (patch `linux-4.4.302-fbx.patch`, 36 Mo)
+
 - **Kernel = Linux 4.4.302** (BSP Qualcomm MSM8998) + patch Free. Userland **busybox + musl**.
 - **Protection rootfs** :
   - **dm-verity** (`CONFIG_SYSTEM_TRUSTED_KEYS="verity.x509.pem"`) → intégrité signée.
@@ -346,6 +358,7 @@ Portail de conformité GPL de Free. Seules les **parties open-source** sont publ
 - **Pas de LSM custom** (security/ = commoncap/lsm_audit standards). → **Le sandbox "Access prohibited" du QML est userland (runtime `fbxqmltv`), PAS kernel.** Conséquence : du **code natif hors-QML** (post-exploit) ne subirait pas cette restriction de chemin.
 
 ### Montage rootfs & boot (analyse du patch kernel)
+
 - **dm-verity** via cmdline `dm="... verity payload=.. hashtree=.. alg=sha1"` (parser `init/do_mounts_dm.c`, style ChromeOS). **dm-verity = intégrité, pas chiffrement.**
 - **`req-dm-crypt`** présent = dm-crypt Qualcomm via **ICE (Inline Crypto Engine)** → chiffrement disque HW possible. `heh(aes)` enregistré (mode wide-block). → rootfs prod probablement **verity + dm-crypt ICE**.
 - ⚠️ **Cmdline baked dans le kernel = config DEV/USINE NFS** : `root=/dev/nfs ip=…eth0.41:dhcp dhcpclass=linux-fbx7hd earlycon=msm_serial_dm,0xc1b0000 console=ttyMSM0,115200,n8 androidboot.bootdevice=1da4000.ufshc`. → Free boote ses Players de dev **en NFS sur VLAN 41**. Le **cmdline de prod** (`dm=verity/crypt`, root-hash, **clé**) est **injecté par ABL au runtime** → **il faut reverser ABL** pour le schéma de clé (Phase A).
@@ -353,6 +366,7 @@ Portail de conformité GPL de Free. Seules les **parties open-source** sont publ
 - 💡 Le rootfs **sur le flash** = squashfs + verity (+ crypt ICE) ; l'image **OTA** est chiffrée séparément (SKRY/heh). Un **dump flash** (UART/EDL) pourrait donner le rootfs déchiffré par l'ICE au runtime — à confirmer.
 
 ### À exploiter (offline, sans hardware)
+
 - [x] ~~Cmdline/montage dm-verity~~ → fait (cf. ci-dessus). Paramètres de prod = dans ABL.
 - [ ] **CVE locales kernel 4.4.302** (EOL) → utiles SI on obtient un jour du code natif en userland.
 - [ ] `fbxserial` : format du blob device (où sont stockées les clés/identité).
@@ -413,7 +427,9 @@ Devenir la **vraie passerelle** du Player (pas de spoof) → aucune anomalie dé
 5. Hardware : repérer un **UART/console série** sur la carte (repli si réseau = cul-de-sac).
 
 ## 🎛️ Namespace HTTP `/pub/*` du Player + télécommande réseau
+
 Le Player expose un namespace `/pub/` (port 80). Énuméré sur le device (~40 candidats) :
+
 - **`/pub/devel`** → 200 (JSON-RPC mode dev, cf. plus haut).
 - **`/pub/remote_control`** → 403 sans code. **API télécommande réseau** : `GET /pub/remote_control?code=<CODE>&key=<KEY>` (code dans réglages Player ; codes touches : [dev.freebox.fr/sdk/freebox_player_codes.html](https://dev.freebox.fr/sdk/freebox_player_codes.html)).
 - Tout le reste (`system/status/api/update/reboot/exec/shell/…`) → 404.
@@ -423,21 +439,25 @@ Le Player expose un namespace `/pub/` (port 80). Énuméré sur le device (~40 c
 **Capacité confirmée** (2026-06-27) : avec le **code télécommande réseau** (réglages Player ; *non commité* — secret), `GET /pub/remote_control?code=<CODE>&key=<KEY>` → **HTTP 200**, on pilote le Player (testé `vol_inc`, `power`). Réutilisable pour automatiser des tests (navigation/apps).
 
 ### 🔴 Problème "Player orphelin" + objectif root concret
+
 - Ligne Free **résiliée** + Player Devialet **non rattachable** à la box actuelle (Pop ; Free n'autorise que sur Ultra) → le Player reste **orphelin**, **LED façade allumée/clignotante en permanence** (recherche d'appairage), forte conso + pollution lumineuse.
 - La touche réseau **`power` (veille) ne calme PAS la LED** : la LED est pilotée par le **PSoC `fbx7hd-top-psoc` / `fbxgpio`** selon l'état d'appairage, **indépendamment de la veille**. Aucun levier software sans root.
 - **Sans root** : seul le **débranchement** coupe LED + conso.
 - 🎯 **Objectif root concret & motivant** : piloter **`fbxgpio` / le PSoC façade** pour **éteindre la LED** (et idéalement booter un OS qui ne cherche pas d'appairage). Cas d'usage réel qui justifie le jailbreak au-delà d'Android.
 
 ### Vérifications "contrôle LED" et "simuler l'association" (2026-06-27)
+
 - **LED contrôlable par l'app ?** **Non** — introspection de `Application` : seulement window-level + `consoleState`/`appState`, **aucune** API led/power/gpio/system. Communauté confirme : LED non désactivable sans root ([toosurtoo](https://freebox.toosurtoo.com/forum/player-devialet/tuto-utiliser-le-player-devialet-sans-connexion-t23337.html)).
 - **Simuler l'association Player↔Server ?** Le clignotement = état **« recherche serveur »**. Protocole **propriétaire + authentifié** (Server authentifie le Player via clés `fbxserial`) → émuler = reverser un protocole authentifié, **lourd et probablement crypto-gated**. Aucune méthode publique.
 - **Acquis utile** : le Player orphelin **reste fonctionnel** en standalone (Netflix/Deezer/Alexa/Bluetooth) sur un réseau tiers ; seule la LED reste allumée (cosmétique).
 - → Les deux idées butent sur **root** (LED) ou un **gros reverse crypto** (association). Pas de quick win.
 
 ## 🧭 Pistes restantes — carte honnête (2026-06-27)
+
 Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste**, classé par réalisme.
 
 ### Software (sur le device, sans ouvrir le boîtier)
+
 | Piste | État | Potentiel | Effort |
 |-|-|-|-|
 | **AirPlay/RAOP RCE** (daemon réseau on-device, `srcvers 220.68` legacy, `/playback-info` → **500**) | **JAMAIS exploré** | Foothold dans un **process système** (sandbox ≠ QML, peut-être plus faible) | moyen (fuzz/CVE) |
@@ -447,15 +467,19 @@ Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste*
 | **Exploit moteur Qt 5.8 / WebKit 16.4** | écarté (dur, WASM off) | évasion sandbox QML/navigateur | très élevé |
 
 ### Hardware (ouvrir le boîtier — Eric)
+
 UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch du fuse-check/vérif RSA. Cf. `ERIC-HARDWARE-BRIEF.md`.
 
 ### La plus prometteuse non encore tentée
+
 👉 **AirPlay/RAOP** : **service réseau on-device**, **AirPlay 1 legacy** (pas de pairing/FairPlay), endpoint qui **plante** (`/playback-info` 500). Un bug mémoire = **code exec dans un daemon système**, potentiellement **hors sandbox QML**.
 
-**Sondage (2026-06-27)** : RTSP 5000 répond **sans auth** à `OPTIONS/ANNOUNCE/SETUP/RECORD/SET_PARAMETER/...` → **surface de parsing non authentifiée** (SDP, plist binaire, RTP, décodeur ALAC). AirPlay 7000 : `/server-info` 200, `/playback-info` 500 constant (état "no session"). 
+**Sondage (2026-06-27)** : RTSP 5000 répond **sans auth** à `OPTIONS/ANNOUNCE/SETUP/RECORD/SET_PARAMETER/...` → **surface de parsing non authentifiée** (SDP, plist binaire, RTP, décodeur ALAC). AirPlay 7000 : `/server-info` 200, `/playback-info` 500 constant (état "no session").
+
 - **Limite** : le binaire du daemon est dans le **rootfs chiffré** → pas de reverse offline. Exploitation = **fuzzing black-box** du device (ANNOUNCE/SETUP/plist) ou CVE RAOP/shairport proche de `220.68`. Effort réel, pas un quick win, mais **c'est la meilleure surface software non-bootloader restante**.
 
 **Fuzzing — 1ère campagne (2026-06-27, `scripts/airplay-fuzz.py`)** :
+
 - Harnais black-box opérationnel (mutations RTSP/SDP/Content-Length/format-string, mode fire-and-forget ~44 cas/s, détection crash par liveness).
 - 1er run RTSP 5000 : 2 "crashes" détectés → **faux positifs** (liveness time-out sous la charge du fuzzing). **Rejeu isolé → daemon vivant** : pas de vrai crash. Le **format-string `%n%n%s` est géré** (pas de bug).
 - **Détecteur durci** : ne loggue un crash que s'il **re-tue le daemon en rejeu isolé** (anti faux-positif de charge).
@@ -463,6 +487,7 @@ UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch d
 - **Conclusion piste AirPlay/RAOP** : surface réelle et non authentifiée, mais **robuste** au fuzzing sans instrumentation. Pour aller plus loin il faudrait : mutations **grammar-aware** (SDP/plist binaires structurés), le **port 7000 (plists AirPlay)** non encore fuzzé, ou le **binaire du daemon** (dans le rootfs chiffré → hors d'atteinte). Coût élevé, ROI incertain. **Pas le quick win espéré.**
 
 ## Annexes
+
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
 - [freebox_player_codes](https://dev.freebox.fr/sdk/freebox_player_codes.html) — codes touches télécommande réseau.
 - [CVE - Qualcomm](https://www.cvedetails.com/vulnerability-list/vendor_id-153/Qualcomm.html) — pour l'angle bootloader/EDL.
