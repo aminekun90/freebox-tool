@@ -22,15 +22,23 @@ Ne contribuez avec des résultats que sur **votre propre** Player Delta.
 
 ```
 freebox-tool/
-├── README.md           # ce fichier — contexte & onboarding
-├── FINDINGS.md         # journal des découvertes (réseau, hardware, mode dev, sandbox)
-├── PLAN.md             # plan d'exécution code-execution → sondage sandbox → escalade
-├── ATTACK-ROADMAP.md   # voie hardware/EDL/bootloader (plan B)
+├── README.md            # ce fichier — contexte & onboarding
+├── ETAT-DES-LIEUX.md    # ⭐ synthèse : ce qui est prouvé, ce qui bloque, les options
+├── SNAPL-TESTMODE.md    # ⭐ snapl accepte un noyau non signé en mode test (GPIO 29)
+├── FINDINGS.md          # journal des découvertes (réseau, hardware, mode dev, sandbox)
+├── PLAN.md              # plan d'exécution code-execution → sondage sandbox → escalade
+├── PLAN-BOOTCHAIN.md    # plan bootloader (ABL) + hardware
+├── ATTACK-ROADMAP.md    # voie hardware/EDL/bootloader
+├── WEBKIT-LEAD.md       # piste moteur WebKit (écartée, documentée)
 ├── app/
-│   └── probe/          # app QML de sondage du sandbox (manifest.json + Main.qml)
+│   ├── probe/           # app QML de sondage du sandbox (manifest.json + Main.qml)
+│   └── browserprobe/    # sonde de fingerprint du moteur web
 └── scripts/
-    ├── fbx-deploy.py   # ⭐ déploie/exécute une app QML sur le Player (mode dev)
-    └── recon.sh        # scan réseau non destructif (nmap + mDNS + SSDP)
+    ├── mkimagetag.py    # ⭐ forge un imagetag et rejoue les portes de boot_from_tag
+    ├── xref-aarch64.py  # ⭐ xrefs ADRP/ADD dans un ELF AArch64 strippé (sans Ghidra)
+    ├── fbx-deploy.py    # déploie/exécute une app QML sur le Player (mode dev)
+    ├── airplay-fuzz.py  # harnais de fuzzing RTSP/RAOP
+    └── recon.sh         # scan réseau non destructif (nmap + mDNS + SSDP)
 ```
 
 ## 🔥 État actuel — CODE EXECUTION obtenue (2026-06-26)
