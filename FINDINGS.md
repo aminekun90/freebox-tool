@@ -470,6 +470,59 @@ Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste*
 
 UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch du fuse-check/vérif RSA. Cf. `ERIC-HARDWARE-BRIEF.md`.
 
+### 🚨 `snapl` — bypass de secure-boot par le mode test (2026-08-18)
+
+Reverse de **`comp08` = `snapl`**, le bootloader **maison de Free** (`SNAPLDR`,
+`rawoul@speedcore`, 2019-02-08) — pas du code Qualcomm. Analyse complète dans
+[`SNAPL-TESTMODE.md`](./SNAPL-TESTMODE.md).
+
+- **La vérif de signature est opt-in**, pilotée par le bit 0 des `flags` de la
+  partition kernel **de l'image qu'on fournit**. En `boot_from_tag(tag, size, mode)`
+  @ `0x9fa09aa0`, si `mode == 0` **et** que l'image se déclare non signée, l'appel à
+  `verify_signature()` est **purement sauté** (`0x9fa09cb4`).
+- **Deux appelants seulement** : `0x9fa0a40c` avec `mode=1` (flash, vérif exigée) et
+  `0x9fa0acd0` avec `mode=0` (**boot réseau test-mode, non signé accepté**).
+- **Le mode test est sélectionné par un GPIO** : `snapl` lit le **pin 29** en entrée
+  @ `0x9fa00680` ; **haut ⇒ boot réseau** (DHCP + TFTP sur **VLAN 41**, le même que
+  la cmdline NFS des sources GPL).
+- **Verrou restant** : handshake `fbxauthd` (UDP **25234**, magic `0x89892df8`) —
+  le Player envoie un nonce de 16 o et attend `MD5(nonce || K)`. `K` (16 o) est
+  fournie par le **trustlet TrustZone `fbxta`** (cmd 2, key_id 1) → pas d'extraction
+  offline.
+- **La vraie ouverture** : l'auth arrive **après** que `snapl` ait déjà traité des
+  paquets entièrement contrôlés par l'attaquant → surface non authentifiée, en EL1,
+  sans ASLR. 🔒 Résultat obtenu sur cette surface, **non publié** — cf. section
+  divulgation ci-dessous.
+
+Format conteneur au passage : en-tête de bank décodé (magic `0x3658382b`, table de
+partitions stride `0x2c`, max 8) et structure **`SKRY`** (600 o : clé AES enveloppée
+RSA-2048 + SHA-512 + sous-magic `SK31` + signature RSA-2048).
+
+Outil ajouté : `scripts/xref-aarch64.py` (xrefs ADRP/ADD sans Ghidra).
+
+### 🔒 `snapl` — vulnérabilité mémoire pré-auth (2026-08-18) — *détails non publiés*
+
+L'audit statique de la pile réseau de `snapl` a mis au jour une **corruption mémoire
+atteignable avant toute authentification**, permettant de contourner le verrou
+`fbxauthd` décrit ci-dessus. Le chemin d'exploitation a été analysé jusqu'à
+l'identification d'une cible de détournement de flot de contrôle.
+
+**Les détails techniques ne sont pas publiés.** Il s'agit d'une vulnérabilité réseau
+non authentifiée dans un bootloader **d'un produit Free actuellement en service** ;
+elle n'a pas encore été remontée à Free. Publier le déclencheur avant divulgation
+responsable serait irresponsable, quand bien même l'atteinte exige un accès physique.
+
+État de la divulgation :
+
+- [ ] Contact Free (`security@freebox.fr` / bug bounty)
+- [ ] Délai de correction convenu
+- [ ] Publication des détails
+
+**Vous travaillez sur votre propre Player Delta et vous voulez creuser ?**
+Contactez-moi (issue ou email sur le profil GitHub) — je partage l'analyse en privé
+avec les chercheurs qui possèdent le matériel. Aucun PoC armé ne sera publié ici
+avant la fin du processus de divulgation.
+
 ### La plus prometteuse non encore tentée
 
 👉 **AirPlay/RAOP** : **service réseau on-device**, **AirPlay 1 legacy** (pas de pairing/FairPlay), endpoint qui **plante** (`/playback-info` 500). Un bug mémoire = **code exec dans un daemon système**, potentiellement **hors sandbox QML**.

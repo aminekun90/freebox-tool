@@ -104,9 +104,20 @@ python3 scripts/fbx-deploy.py app/probe
 - ✅ **Firmware complet** récupéré (OTA HTTP) ; **chaîne de boot en clair décompilée** (Ghidra).
 - ✅ **Modèle de sécurité entièrement compris** (preuve par le code).
 
-**Ce qui est un CUL-DE-SAC software (pour root/Android) :**
-- Le secure-boot est **verrouillé dans le silicium** : vérif **RSA matérielle**, état de lock = **fuse QFPROM** (OTP irréversible), unlock = **token signé OEM** (clé détenue par Free seul).
-- **Aucun soft-unlock n'existe** — fermeture *architecturale*, pas un manque de recherche.
+**🚨 Nouveau (2026-08-18) — `snapl` accepte un noyau NON SIGNÉ en mode test :**
+- Le bootloader **maison de Free** (`snapl`, `comp08` — pas du code Qualcomm) a un **mode test réseau sélectionné par le GPIO 29** qui **TFTP-boote un kernel arbitraire**.
+- La vérif de signature y est **opt-in** : un bit de flag, **dans l'image qu'on fournit soi-même**, suffit à faire sauter l'appel à `verify_signature()`.
+- Verrou restant sur ce chemin : un handshake `fbxauthd` en `MD5(nonce || K)`, `K` scellée en TrustZone.
+- 👉 Détail complet : [`SNAPL-TESTMODE.md`](./SNAPL-TESTMODE.md).
+
+**🔒 Une seconde piste lève ce dernier verrou — détails non publiés.**
+Vulnérabilité mémoire **pré-authentification** dans la pile réseau de `snapl`.
+**Divulgation responsable auprès de Free en cours** (produit en service) : rien ne
+sera publié ici avant. Chercheurs possédant un Player Delta : contactez-moi.
+
+**Ce qui reste fermé (voie fastboot/unlock classique) :**
+- Le secure-boot Qualcomm est **verrouillé dans le silicium** : vérif **RSA matérielle**, état de lock = **fuse QFPROM** (OTP irréversible), unlock = **token signé OEM** (clé détenue par Free seul).
+- **Aucun soft-unlock n'existe** par cette voie — fermeture *architecturale*.
 - Le **sandbox QML** est hermétique ; le **système (rootfs) est chiffré** (AES-HEH + dm-verity).
 
 **Les seules portes restantes (toutes lourdes, non-software) :**

@@ -12,7 +12,22 @@
 - **Hardware 100 % capable** : SoC **Qualcomm APQ8098** (= MSM8998 / Snapdragon 835 sans modem), 2 Go RAM, 32 Go eMMC. Même puce que Pixel 2 / OnePlus 5 / Galaxy S8 → Android tourne nativement.
 - **Verrou = chaîne de boot signée**, pas le matériel. Secure Boot Qualcomm + firmware Free signé.
 - **Aucune voie officielle** : Free a refusé Android TV sur ce Player ([FS#33524](https://dev.freebox.fr/bugs/task/33524), [FS#34632](https://dev.freebox.fr/bugs/task/34632) clos « ne sera pas implémenté »). Le jailbreak communautaire est la seule option.
-- **Le projet se ramène à UN artefact** : le **firehose programmer signé par Free** pour ce board. Avec lui, l'exploit peek/poke d'Aleph donne EL3 → contrôle total. Sans lui, l'EDL est inerte sur MSM8998.
+- ~~**Le projet se ramène à UN artefact** : le firehose signé par Free.~~ **PLUS VRAI depuis le 2026-08-18.**
+
+> 🚨 **Le centre de gravité a changé — lire d'abord [`SNAPL-TESTMODE.md`](./SNAPL-TESTMODE.md).**
+>
+> Le maillon exploitable n'est pas la chaîne Qualcomm (vérif RSA matérielle propre,
+> fuse QFPROM) mais **`snapl`, le bootloader maison de Free**, 107 Ko de C artisanal :
+>
+> - un **mode test réseau sélectionné par le GPIO 29** qui **accepte un noyau non signé**
+>   (la vérif de signature est *opt-in*, pilotée par un bit de flag dans l'image qu'on
+>   fournit soi-même) ;
+> - le verrou restant sur ce chemin est un handshake `fbxauthd` dont la clé vit en
+>   TrustZone — **et une seconde piste, non publiée, permet de le contourner**
+>   (cf. `FINDINGS.md`, section divulgation).
+>
+> Plus besoin du firehose ni de la clé OEM.
+> Prérequis restant : **ouvrir le boîtier pour tirer le GPIO 29 au niveau haut**.
 
 ## Pourquoi l'EDL seul ne suffit pas (sur ce SoC)
 
@@ -108,8 +123,23 @@ Avantage bonus : le Mac voyant **tout** le trafic en clair au niveau IP, on peut
 - [ ] **Recenser les firehose MSM8998 publics** (autres devices SD835) et tester s'ils passent — improbable si QFuse blown, mais certains boards de prod ont le secure boot non verrouillé. Liste : [XDA firehose loaders](https://xdaforums.com/t/identifying-edl-firehose-loaders.4525079/).
 - [ ] **Veille CVE chaîne de boot MSM8998** : XBL/ABL/LK, anti-rollback, Sahara. Réévaluer [CVE-2021-1931](https://xdaforums.com/t/xz1c-xz1-xzp-xperable-xperia-abl-fastboot-exploit-cve-2021-1931.4771931/) (Sony-only aujourd'hui) si une surface fastboot apparaît.
 
+### Tier 0ter — ⭐ Reverse de `snapl` (offline, aucun hardware) — **PRIORITÉ ACTUELLE**
+
+- [x] ~~Identifier le composant~~ → `comp08` = `snapl`, bootloader maison de Free.
+- [x] ~~Trouver un bypass de vérif de signature~~ → mode test, `boot_from_tag(…, mode=0)`.
+- [x] ~~Trouver la sélection du mode test~~ → **GPIO 29** lu en entrée @ `0x9fa00680`.
+- [x] ~~Auditer la pile réseau~~ → 🔒 résultat non publié (divulgation en cours, cf. `FINDINGS.md`).
+- [x] ~~Reverser l'allocateur~~ → dlmalloc (confirmé par signatures : seuil `0xe8`,
+      `MIN_CHUNK_SIZE` 32, contrôle `unlink` avec panic `malloc abort`).
+- [x] ~~Déterminer si le tas est exécutable~~ → `snapl` tourne en **EL1** (seuls des
+      registres `_EL1` sont écrits : `MAIR`/`TCR`/`TTBR0`/`SCTLR`/`VBAR`), et **PXN est
+      absent** de tous les descripteurs de bloc → **tas exécutable en EL1**.
+- [ ] Auditer le parsing des options DHCP (`bad OFFER packet`) — même fenêtre pré-auth.
+- [ ] Auditer `tftp_read_block` avec la même grille : borne sur pointeur vs borne sur longueur.
+
 ### Tier 1 — Investigation hardware non destructive (besoin du board ouvert)
 
+- [ ] ⭐ **Localiser le pad du GPIO 29** (croiser `drivers/fbxgpio/` des sources GPL + photos du PCB). Un simple strap au niveau haut au reset ouvre le mode test réseau — **c'est devenu l'action hardware n°1**, avant l'UART.
 - [ ] **Repérer l'UART** (TX/RX/GND, souvent 1.8 V) sur la carte. Capturer le log de boot (U-Boot/LK) → révèle bootloader, version, éventuel shell. **Pistes communautaires : test points `TP5`/`TP6`/`TP7`** ([EricBlanquer/freebox-devialet-hack](https://github.com/EricBlanquer/freebox-devialet-hack), adaptateur CP2102). Stockage **UFS** (≠ eMMC) → adapter la méthode de dump physique.
 - [ ] **Repérer les test points EDL** : court-circuiter au GND au boot jusqu'à énumérer `Qualcomm HS-USB 9008`. Documenter leur position (photo annotée).
 - [ ] **Dumper le hello Sahara** avec `edl.py` une fois en 9008 → hardware-ID, PK hash, état secure boot.

@@ -7,3 +7,6 @@ firmware/*
 *.img
 *.bin
 .DS_Store
+
+# Notes privees (divulgation en cours) — ne jamais committer
+PRIVATE-*

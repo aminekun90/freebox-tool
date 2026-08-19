@@ -92,7 +92,16 @@ Firmware ABL en clair → reverse Ghidra (Volet A)
 | picocom + CP2102 | capture UART |
 | QEMU (option) | émulation partielle d'ABL pour fuzzing |
 
-## Priorité conseillée
-1. **A1+A2** (reverse ABL) — faisable **maintenant**, sur le firmware déjà téléchargé, sans hardware.
-2. **B1** (UART) — quand le boîtier est ouvert (Eric).
-3. B2/B3 selon résultats.
+## Priorité conseillée — RÉVISÉE (2026-08-18)
+
+> ⚠️ Ce plan visait ABL/XBL (code Qualcomm). Le reverse a montré que **le maillon
+> intéressant est `snapl`, le bootloader maison de Free** (`comp08`), bien plus mou.
+> Cf. [`SNAPL-TESTMODE.md`](./SNAPL-TESTMODE.md). Une seconde piste existe mais
+> **n'est pas publiée** (divulgation responsable en cours, cf. `FINDINGS.md`).
+
+1. **GPIO 29** — localiser le pad sur le PCB (croiser `drivers/fbxgpio/` + photos).
+   C'est un simple strap à tirer haut au reset, et c'est ce qui ouvre le mode test.
+2. **B1** (UART) — quand le boîtier est ouvert. Utile pour observer le boot réseau.
+3. A1+A2 (reverse ABL/XBL Qualcomm) — **déclassé** : vérif RSA matérielle propre,
+   pas de faille évidente. À ne reprendre que si (1) échoue.
+4. B2/B3 (GPIO bank0, EDL) selon résultats.
