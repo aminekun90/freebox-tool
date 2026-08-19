@@ -1,5 +1,8 @@
 # Freebox Tool — Devialet/Freebox Delta Player reverse-engineering
 
+> 👉 **Tu reprends le projet ? Commence par [`HANDOFF.md`](./HANDOFF.md)** — état des
+> lieux, ce qui est prouvé, le verrou restant, et les options classées par coût.
+
 > Reprise de contrôle logicielle d'un **Freebox Delta Player (conçu par Devialet)**,
 > devenu inutile sans abonnement TV Free. **North star : faire tourner Android
 > dessus, en jailbreak 100 % software.** Repli accepté : obtenir un shell, ou
