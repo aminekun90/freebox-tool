@@ -22,15 +22,23 @@ Ne contribuez avec des résultats que sur **votre propre** Player Delta.
 
 ```
 freebox-tool/
-├── README.md           # ce fichier — contexte & onboarding
-├── FINDINGS.md         # journal des découvertes (réseau, hardware, mode dev, sandbox)
-├── PLAN.md             # plan d'exécution code-execution → sondage sandbox → escalade
-├── ATTACK-ROADMAP.md   # voie hardware/EDL/bootloader (plan B)
+├── README.md            # ce fichier — contexte & onboarding
+├── ETAT-DES-LIEUX.md    # ⭐ synthèse : ce qui est prouvé, ce qui bloque, les options
+├── SNAPL-TESTMODE.md    # ⭐ snapl accepte un noyau non signé en mode test (GPIO 29)
+├── FINDINGS.md          # journal des découvertes (réseau, hardware, mode dev, sandbox)
+├── PLAN.md              # plan d'exécution code-execution → sondage sandbox → escalade
+├── PLAN-BOOTCHAIN.md    # plan bootloader (ABL) + hardware
+├── ATTACK-ROADMAP.md    # voie hardware/EDL/bootloader
+├── WEBKIT-LEAD.md       # piste moteur WebKit (écartée, documentée)
 ├── app/
-│   └── probe/          # app QML de sondage du sandbox (manifest.json + Main.qml)
+│   ├── probe/           # app QML de sondage du sandbox (manifest.json + Main.qml)
+│   └── browserprobe/    # sonde de fingerprint du moteur web
 └── scripts/
-    ├── fbx-deploy.py   # ⭐ déploie/exécute une app QML sur le Player (mode dev)
-    └── recon.sh        # scan réseau non destructif (nmap + mDNS + SSDP)
+    ├── mkimagetag.py    # ⭐ forge un imagetag et rejoue les portes de boot_from_tag
+    ├── xref-aarch64.py  # ⭐ xrefs ADRP/ADD dans un ELF AArch64 strippé (sans Ghidra)
+    ├── fbx-deploy.py    # déploie/exécute une app QML sur le Player (mode dev)
+    ├── airplay-fuzz.py  # harnais de fuzzing RTSP/RAOP
+    └── recon.sh         # scan réseau non destructif (nmap + mDNS + SSDP)
 ```
 
 ## 🔥 État actuel — CODE EXECUTION obtenue (2026-06-26)
@@ -104,9 +112,20 @@ python3 scripts/fbx-deploy.py app/probe
 - ✅ **Firmware complet** récupéré (OTA HTTP) ; **chaîne de boot en clair décompilée** (Ghidra).
 - ✅ **Modèle de sécurité entièrement compris** (preuve par le code).
 
-**Ce qui est un CUL-DE-SAC software (pour root/Android) :**
-- Le secure-boot est **verrouillé dans le silicium** : vérif **RSA matérielle**, état de lock = **fuse QFPROM** (OTP irréversible), unlock = **token signé OEM** (clé détenue par Free seul).
-- **Aucun soft-unlock n'existe** — fermeture *architecturale*, pas un manque de recherche.
+**🚨 Nouveau (2026-08-18) — `snapl` accepte un noyau NON SIGNÉ en mode test :**
+- Le bootloader **maison de Free** (`snapl`, `comp08` — pas du code Qualcomm) a un **mode test réseau sélectionné par le GPIO 29** qui **TFTP-boote un kernel arbitraire**.
+- La vérif de signature y est **opt-in** : un bit de flag, **dans l'image qu'on fournit soi-même**, suffit à faire sauter l'appel à `verify_signature()`.
+- Verrou restant sur ce chemin : un handshake `fbxauthd` en `MD5(nonce || K)`, `K` scellée en TrustZone.
+- 👉 Détail complet : [`SNAPL-TESTMODE.md`](./SNAPL-TESTMODE.md).
+
+**🔒 Une seconde piste lève ce dernier verrou — détails non publiés.**
+Vulnérabilité mémoire **pré-authentification** dans la pile réseau de `snapl`.
+**Divulgation responsable auprès de Free en cours** (produit en service) : rien ne
+sera publié ici avant. Chercheurs possédant un Player Delta : contactez-moi.
+
+**Ce qui reste fermé (voie fastboot/unlock classique) :**
+- Le secure-boot Qualcomm est **verrouillé dans le silicium** : vérif **RSA matérielle**, état de lock = **fuse QFPROM** (OTP irréversible), unlock = **token signé OEM** (clé détenue par Free seul).
+- **Aucun soft-unlock n'existe** par cette voie — fermeture *architecturale*.
 - Le **sandbox QML** est hermétique ; le **système (rootfs) est chiffré** (AES-HEH + dm-verity).
 
 **Les seules portes restantes (toutes lourdes, non-software) :**

@@ -470,6 +470,59 @@ Après reverse complet : root = pas de chemin facile. Voici **tout ce qui reste*
 
 UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch du fuse-check/vérif RSA. Cf. `ERIC-HARDWARE-BRIEF.md`.
 
+### 🚨 `snapl` — bypass de secure-boot par le mode test (2026-08-18)
+
+Reverse de **`comp08` = `snapl`**, le bootloader **maison de Free** (`SNAPLDR`,
+`rawoul@speedcore`, 2019-02-08) — pas du code Qualcomm. Analyse complète dans
+[`SNAPL-TESTMODE.md`](./SNAPL-TESTMODE.md).
+
+- **La vérif de signature est opt-in**, pilotée par le bit 0 des `flags` de la
+  partition kernel **de l'image qu'on fournit**. En `boot_from_tag(tag, size, mode)`
+  @ `0x9fa09aa0`, si `mode == 0` **et** que l'image se déclare non signée, l'appel à
+  `verify_signature()` est **purement sauté** (`0x9fa09cb4`).
+- **Deux appelants seulement** : `0x9fa0a40c` avec `mode=1` (flash, vérif exigée) et
+  `0x9fa0acd0` avec `mode=0` (**boot réseau test-mode, non signé accepté**).
+- **Le mode test est sélectionné par un GPIO** : `snapl` lit le **pin 29** en entrée
+  @ `0x9fa00680` ; **haut ⇒ boot réseau** (DHCP + TFTP sur **VLAN 41**, le même que
+  la cmdline NFS des sources GPL).
+- **Verrou restant** : handshake `fbxauthd` (UDP **25234**, magic `0x89892df8`) —
+  le Player envoie un nonce de 16 o et attend `MD5(nonce || K)`. `K` (16 o) est
+  fournie par le **trustlet TrustZone `fbxta`** (cmd 2, key_id 1) → pas d'extraction
+  offline.
+- **La vraie ouverture** : l'auth arrive **après** que `snapl` ait déjà traité des
+  paquets entièrement contrôlés par l'attaquant → surface non authentifiée, en EL1,
+  sans ASLR. 🔒 Résultat obtenu sur cette surface, **non publié** — cf. section
+  divulgation ci-dessous.
+
+Format conteneur au passage : en-tête de bank décodé (magic `0x3658382b`, table de
+partitions stride `0x2c`, max 8) et structure **`SKRY`** (600 o : clé AES enveloppée
+RSA-2048 + SHA-512 + sous-magic `SK31` + signature RSA-2048).
+
+Outil ajouté : `scripts/xref-aarch64.py` (xrefs ADRP/ADD sans Ghidra).
+
+### 🔒 `snapl` — vulnérabilité mémoire pré-auth (2026-08-18) — *détails non publiés*
+
+L'audit statique de la pile réseau de `snapl` a mis au jour une **corruption mémoire
+atteignable avant toute authentification**, permettant de contourner le verrou
+`fbxauthd` décrit ci-dessus. Le chemin d'exploitation a été analysé jusqu'à
+l'identification d'une cible de détournement de flot de contrôle.
+
+**Les détails techniques ne sont pas publiés.** Il s'agit d'une vulnérabilité réseau
+non authentifiée dans un bootloader **d'un produit Free actuellement en service** ;
+elle n'a pas encore été remontée à Free. Publier le déclencheur avant divulgation
+responsable serait irresponsable, quand bien même l'atteinte exige un accès physique.
+
+État de la divulgation :
+
+- [ ] Contact Free (`security@freebox.fr` / bug bounty)
+- [ ] Délai de correction convenu
+- [ ] Publication des détails
+
+**Vous travaillez sur votre propre Player Delta et vous voulez creuser ?**
+Contactez-moi (issue ou email sur le profil GitHub) — je partage l'analyse en privé
+avec les chercheurs qui possèdent le matériel. Aucun PoC armé ne sera publié ici
+avant la fin du processus de divulgation.
+
 ### La plus prometteuse non encore tentée
 
 👉 **AirPlay/RAOP** : **service réseau on-device**, **AirPlay 1 legacy** (pas de pairing/FairPlay), endpoint qui **plante** (`/playback-info` 500). Un bug mémoire = **code exec dans un daemon système**, potentiellement **hors sandbox QML**.
@@ -485,6 +538,168 @@ UART `ttyMSM0@115200` (TP5-7) · EDL/Sahara · GPIO bank0 (recovery) · glitch d
 - **Détecteur durci** : ne loggue un crash que s'il **re-tue le daemon en rejeu isolé** (anti faux-positif de charge).
 - **Verdict (2 passages, ~5000 cas avec détecteur durci)** : **0 crash réel**, Player intact (ping/ports OK). Le parser RAOP **résiste au fuzzing black-box dumb**. `%n` géré, bornes OK.
 - **Conclusion piste AirPlay/RAOP** : surface réelle et non authentifiée, mais **robuste** au fuzzing sans instrumentation. Pour aller plus loin il faudrait : mutations **grammar-aware** (SDP/plist binaires structurés), le **port 7000 (plists AirPlay)** non encore fuzzé, ou le **binaire du daemon** (dans le rootfs chiffré → hors d'atteinte). Coût élevé, ROI incertain. **Pas le quick win espéré.**
+
+## 🔘 `bank0` — un système de secours v1.2, forçable par le BOUTON RESET (2026-08-19)
+
+### Le GPIO `force_bank0` est le bouton Factory Reset
+
+Dans `apq8098-freebox-batfish.dts` (sources GPL) :
+
+```dts
+force_bank0: force_bank0 {
+        mux    { pins = "gpio18"; function = "gpio"; };
+        config { pins = "gpio18"; drive-strength = <2>; bias-disable; };
+};
+
+gpio_keys {
+        pinctrl-0 = <&force_bank0>;
+        button@1 {
+                label       = "Factory Reset Button";
+                linux,code  = <KEY_SETUP>;
+                gpios       = <&tlmm 18 GPIO_ACTIVE_LOW>;
+        };
+};
+```
+
+**TLMM 18 = `force_bank0` = le bouton Factory Reset.** `GPIO_ACTIVE_LOW`,
+`bias-disable` (pull externe sur la carte) : maintenu enfoncé au démarrage, il tire la
+ligne à la masse et force le boot sur `bank0`.
+
+> 🎯 **Conséquence : `bank0` est atteignable SANS ouvrir le boîtier ni souder.**
+> C'est la différence majeure avec le GPIO 29 (test mode), qui n'a aucun bouton associé
+> et impose un accès au PCB.
+
+⚠️ Le même bouton sert au reset usine côté Linux (`KEY_SETUP`) — la distinction se fait
+sur le moment : maintien **au boot** = `force_bank0` (lu avant Linux) ; appui **en
+fonctionnement** = reset usine. Le reset usine a déjà été testé sur ce Player (aucune
+nouvelle surface), donc pas de perte supplémentaire à craindre.
+
+### Contenu de `bank0` — un système complet, pas un simple bootloader
+
+`boot0_42.20+bank0_1.2` contient un **imagetag complet à l'offset `0x800000`** :
+
+| Partition | Offset | Taille | type | flags |
+|-|-|-|-|-|
+| `kernel` | `0x00001000` | 3 603 028 | 0 | `0x5` signé + compressé |
+| `qcom-dtbs` | `0x00371000` | 56 500 | 3 | `0x5` signé + compressé |
+| `rootfs` | `0x0037f000` | 16 764 928 | 1 | `0x1` signé |
+
+Total 20,4 Mo, **version 1.2** — contre 1.5.24.2 pour `bank1`, soit ~7 ans d'écart de
+correctifs. Le rootfs de 16,7 Mo (vs 131 Mo en `bank1`) indique un **système réduit**,
+vraisemblablement recovery/usine.
+
+### Chiffré comme `bank1` — pas de reverse offline
+
+`kernel` et `qcom-dtbs` sont en conteneur **`SKRY`**, `rootfs` en chiffré brut
+(entropie 7.9998). Le contenu de `bank0` n'est donc **pas analysable hors ligne** ;
+il faudra le sonder en boîte noire une fois booté (même méthodologie que pour `bank1`).
+
+Détail de format : l'en-tête `SKRY` de `bank0` fait **`0x154`** contre **`0x258`** en
+`bank1`. L'écart (`0x104`) correspond exactement au sous-magic `SK31` + la signature
+RSA-2048 — le format a donc **gagné une signature** entre la v1.2 et la v1.5.
+
+### ✅ Sûreté : `snapl` n'écrit rien au boot (vérifié statiquement)
+
+Question critique avant de tenter quoi que ce soit : **est-ce que démarrer peut coûter
+cher ?** Réponse côté bootloader : **non**.
+
+`boot_lun_switch` (`0x9fa02490`) est le **seul chemin d'écriture flash de `snapl`**, et
+il n'a **qu'un seul appelant** (`0x9fa0a490`), gardé ainsi :
+
+```
+boot_failed(reason):
+        cmp  w19, #1
+        b.eq 0x9fa0a470          ; uniquement si reason == 1
+0x9fa0a470:
+        ldr  w0, [0x9fa0001c]    ; numero de bank
+        cmp  w0, #1
+        b.ne 0x9fa0a448          ; si bank != 1 -> AUCUNE ecriture
+        ldr  w0, [0x9fa00018]    ; boot LUN
+        bl   boot_lun_switch     ; bascule 1<->2 et ECRIT
+```
+
+1. **Un boot qui réussit n'écrit rien** — ce code n'est atteint que depuis le
+   gestionnaire d'échec de boot.
+2. **Forcer `bank0` ne peut pas déclencher l'écriture** : elle exige `bank == 1`, donc
+   la condition est fausse en `bank0`, même si le boot échoue.
+3. Le switch n'est qu'un repli A/B entre les deux LUN UFS.
+
+**Limite de cette garantie** : elle ne couvre que `snapl`. Le rootfs de `bank0` étant
+chiffré, on ne sait pas ce que fait son Linux une fois démarré — et un recovery a par
+vocation la capacité de re-flasher. Mitigation : **un recovery ne peut re-flasher que
+s'il a une source de firmware**. Débrancher physiquement l'Ethernet élimine d'un coup
+le re-flash, la MAJ système et la MAJ du bootchain.
+
+**Protocole recommandé** : (1) câble réseau **débranché**, (2) bouton reset maintenu au
+démarrage, observer LED/HDMI, (3) rebrancher seulement sur un segment **sans route vers
+Internet** pour le scan.
+
+### Ce que `bank0` n'apporte PAS
+
+`boot_from_tag` n'a que **deux appelants** (`0x9fa0a40c` avec `mode=1`, `0x9fa0acd0`
+avec `mode=0`). Booter sur `bank0` passe par le chemin flash normal, donc **`mode=1` :
+la signature reste exigée**. `force_bank0` ne contourne aucune vérification — il change
+le *système exécuté*, pas la politique de confiance.
+
+Son intérêt est ailleurs : faire tourner un firmware de ~2019 dont les vulnérabilités
+connues n'ont jamais été corrigées, et dont la surface réseau diffère de `bank1`.
+
+## 🌐 Écosystème & état de l'art (2026-08-19)
+
+### Le fbx7hd reste vierge
+
+Aucun projet public n'a de root sur le Player Delta. Les deux travaux récents sur
+l'écosystème Freebox ne sont **pas transposables** :
+
+| Travail | Cible | Transposable ? |
+|-|-|-|
+| [39C3 — *Set-top box Hacking: freeing the 'Freebox'*](https://media.ccc.de/v/39c3-set-top-box-hacking-freeing-the-freebox) (déc. 2025) | **Freebox HD v5** (2006) — chaîne de 2 0-days dont un kernel | ❌ architecture sans rapport avec un Snapdragon 835. Utile surtout pour sa cartographie du **réseau privé de l'opérateur** (cf. VLAN 41) |
+| [Re-OpenFreebox / revolution-v6](https://github.com/Re-OpenFreebox/revolution-v6) | **Freebox Revolution v6** — root + déchiffrement firmware | ❌ SoC et chaîne de boot différents |
+
+### Free ne documente plus les Players
+
+Le flux officiel [`dev.freebox.fr`](https://dev.freebox.fr/blog/?feed=rss2) reste actif
+**pour le Server** (4.12.3, 23 juil. 2026) mais **s'arrête à la 1.5.21 du 21 oct. 2025**
+pour le Player Devialet/One. Les versions **1.5.24 et 1.5.25 sont déployées sans aucun
+changelog officiel**. Cohérent avec la migration de branches de code annoncée
+(unification Devialet ↔ Révolution + migration d'infra vers FreeTV).
+
+Le programme bêta ([FS#40872](https://dev.freebox.fr/bugs/task/40872)) est **fermé aux
+Player Devialet** (encore ouvert aux Révolution) → pas d'accès légitime à un canal
+`mode=beta`.
+
+### Sources GPL gelées — 2 ans de retard
+
+[`floss.freebox.fr/freebox_player_delta/`](https://floss.freebox.fr/freebox_player_delta/)
+publie au mieux la **1.5.3, datée du 19 avril 2024**, alors que le firmware déployé est
+en 1.5.25. Notre `linux-4.4.302-fbx.patch` et le DTS `apq8098-freebox-batfish.dts`
+correspondent donc à 1.5.3.
+
+**Ce n'est pas bloquant** : le DTS décrit le **PCB**, et le PCB n'a pas changé. Les
+sources 1.5.3 restent valides pour comprendre le matériel.
+
+### ⚠️ Le bootchain est versionné séparément du système
+
+Distinction importante pour évaluer l'impact d'une mise à jour :
+
+| Composant | Version |
+|-|-|
+| `boot0+bank0`, `boot1` (**contient `snapl`**) | **42.20** |
+| `bank1` (kernel + dtbs + rootfs) | 1.5.24.2 |
+
+Une mise à jour **système** (1.5.24 → 1.5.25) **ne touche pas forcément `snapl`**.
+C'est la version du **bootchain** (42.x) qu'il faut surveiller, pas celle du système.
+
+### Stratégie kernel : mainline, pas le 4.4 de Free
+
+Le MSM8998/APQ8098 est **supporté en mainline** (kernel 6.0+), avec des ports
+postmarketOS actifs sur des appareils au même SoC (OnePlus 5/5T `cheeseburger`,
+Xiaomi Mi 6). Partir du **4.4.302-fbx de Free est un mauvais choix** : EOL, criblé de
+CVE, et on n'a de toute façon que la 1.5.3.
+
+**Voie retenue** : kernel **mainline récent** + portage du DTS `apq8098-freebox-batfish`
++ userland custom (Alpine / busybox). Pour un premier boot on ne vise que **console UART
++ réseau** — l'audio Devialet et le HDMI viennent après.
 
 ## Annexes
 
