@@ -112,6 +112,89 @@ w20 = ops->get(dev, 29)              ; lecture du niveau
 des sources GPL et avec le GPIO `bank0-forced` déjà repéré — ce sont deux pins
 distincts, celui-ci n'avait pas été identifié.
 
+### ✅ GPIO 29 confirmé par les sources GPL
+
+Le DTS du board (`arch/arm/boot/dts/qcom/apq8098-freebox-batfish.dts`, publié par Free
+sur floss.freebox.fr) nomme le signal explicitement :
+
+```dts
+test-mode {
+        name = "test-mode";
+        gpio = <&tlmm 29 GPIO_ACTIVE_LOW>;
+        input;
+};
+
+force_test_mode: force_test_mode {
+        mux    { pins = "gpio29"; function = "gpio"; };
+        config { pins = "gpio29"; drive-strength = <2>; bias-pull-down; };
+};
+```
+
+Deux sources indépendantes concordent donc : **TLMM 29**, littéralement appelé
+`test-mode` / `force_test_mode`.
+
+**Polarité** : `bias-pull-down` → au repos la broche lit **0** = boot normal. Il faut
+donc **tirer la broche au niveau HAUT** pour entrer en test mode, ce qui correspond
+exactement au `cbz w20, normal_boot` de `snapl`. Le `GPIO_ACTIVE_LOW` du nœud
+`fbxgpio` n'est que la convention du driver Linux **après** le boot, pas ce que lit
+le bootloader.
+
+> ⚠️ Les TLMM du MSM8998 sont en **1,8 V**. Un strap vers 3,3 V ou 5 V détruit la
+> broche. Il faut une résistance (~1 kΩ) vers le rail 1,8 V de la carte, assez basse
+> pour vaincre le pull-down interne.
+
+Variantes de board présentes dans les DTS : `batfish`, `oarfish`, `proto` — ce sont
+les mêmes noms que les modes de boot énumérés par `snapl`. Le Player Delta est
+probablement un *batfish* (`unknown fish detected %02x, assume it's a bat`, lu sur
+l'EEPROM i2c du carrier).
+
+### ✅ Aucun garde-fou de production
+
+Vérifié instruction par instruction : **aucune écriture de `w20`** entre la lecture
+du GPIO (`0x9fa006c4`) et le branchement vers `test_mode_boot` (`0x9fa007c4`).
+`w20` conserve la valeur brute de la broche. Aucun fuse, aucun flag `fbxserial`,
+aucune condition de production ne désactive le mode test — c'est une porte d'usine
+laissée active en série.
+
+### Aucun anti-rollback
+
+Toutes les occurrences de « version » dans `snapl` sont des contrôles de **format**
+(`tag version == 2`, version GPT, version de protocole `fbxauthd`) — jamais une
+comparaison monotone ni un index de rollback. `boot_from_tag` teste `version == 2`
+et rien d'autre : **une image correctement signée est acceptée quel que soit son âge**.
+
+### Layout mémoire de `snapl`
+
+`heap_init()` @ `0x9fa115ac` :
+
+```
+base         = 0x9fa1e248 & ~0xFFF = 0x9fa1e000
+[0x9fa1b428] = base                      ; heap_start
+[0x9fa1b420] = base + (0x400 << 12)      ; heap_end = base + 4 MiB
+[0x9fa1b418] = base                      ; brk courant
+```
+
+`0x9fa115d4` = `sbrk()` séquentiel (borne basse/haute, avance le brk, retourne
+l'ancien). L'allocateur est **dlmalloc** (seuil `0xe8`, `MIN_CHUNK_SIZE` 32,
+alignement 16, en-tête de 16 o, contrôle `unlink` avec panic `malloc abort`).
+
+Pile : `0x9fa001c8` → `x1 = &image - 0x20` → **`SP_EL1 = 0x9f9fffe0`**,
+`SP_EL0 = 0x9f9ffbe0`, croissance vers le bas.
+
+```
+0x9f9fffe0   pile (croît vers le BAS)
+0x9fa00000   image snapl (.text)
+0x9fa1a5d8   fin .text
+0x9fa1b000   data/bss
+0x9fa1d000   fin bss
+0x9fa1e000   tas (4 MiB)
+0x9fe1e000   fin tas
+```
+
+`snapl` tourne en **EL1** (seuls des registres `_EL1` sont écrits : `MAIR`, `TCR`,
+`TTBR0`, `SCTLR`, `VBAR`). Base fixe, pas d'ASLR, allocateur séquentiel, monothread :
+l'état mémoire est **entièrement déterministe et reproductible d'un boot à l'autre**.
+
 ### `test_mode_boot` @ `0x9fa0aab0`
 
 ```
@@ -191,9 +274,14 @@ Il ne demande que `K`. (Une seconde voie, non publiée, retire cette exigence.)
 
 ## Prochaines actions
 
-- [ ] **Localiser le pin GPIO 29** sur le PCB (croiser `drivers/fbxgpio/` GPL +
-      photos d'Eric). C'est un strap à tirer au niveau haut au reset — non destructif,
-      réversible, et ça ne demande pas de souder l'UART.
+- [x] ~~Identifier le GPIO~~ → **TLMM 29**, confirmé par `snapl` **et** par le DTS GPL.
+- [ ] **Localiser le pad physique du TLMM 29** sur le PCB. C'est un strap à tirer au
+      niveau **haut** (1,8 V, ~1 kΩ) au reset — non destructif et réversible.
+      ⚠️ Faire l'UART **d'abord** : sans console série on ne peut pas savoir si le
+      mode test a été atteint (`## Booting in test mode.`).
+- [ ] Compiler un kernel + DTB depuis le patch GPL (`linux-4.4.302-fbx`,
+      `apq8098-freebox-batfish.dts`) et l'emballer avec `scripts/mkimagetag.py`.
+      Le DTB doit porter le bon `compatible`, sinon `No DTB could boot kernel: tried:`.
 - [x] ~~Auditer statiquement la surface réseau pré-auth de `snapl`~~ → 🔒 fait,
       résultat **non publié** (divulgation en cours, cf. [`FINDINGS.md`](./FINDINGS.md)).
 - [ ] Confirmer le layout exact des flags de partition (bit 0 = signé) en croisant
