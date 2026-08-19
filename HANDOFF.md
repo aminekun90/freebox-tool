@@ -89,6 +89,45 @@ compteur. Code de bootloader écrit sans modèle de menace fault-injection.
 
 Coût : ChipWhisperer (~300 €) ou glitcher maison + patience sur le timing.
 
+### ⛔ Ne perds pas de temps à essayer de casser `K`
+
+`K` fait 16 octets et est utilisée dans `MD5(nonce ‖ K)`. Elle est **hors d'atteinte**,
+pour quatre raisons cumulatives :
+
+| Attaque | Verdict |
+|-|-|
+| Force brute | 2¹²⁸ — pas « difficile », **impossible** |
+| Préimage MD5 | MD5 est cassé en *collision*, **pas en préimage** (~2¹²³ au mieux) |
+| Extension de longueur | **Inapplicable** : le secret est en **suffixe** (`nonce ‖ K`). L'attaque exige `K ‖ msg` |
+| Cryptanalyse hors ligne | **Aucun matériel à attaquer** : pas une seule paire (nonce, digest valide) |
+
+Ce dernier point est le plus définitif : le Player calcule le digest et le compare **en
+interne**, il ne le révèle jamais. Obtenir une paire valide supposerait de connaître déjà
+`K`. Et le trustlet `fbxta` qui la détient vit sur une **partition UFS**, pas dans le
+bootchain téléchargeable.
+
+### Pourquoi la comparaison, elle, est attaquable
+
+Le réflexe : **on n'attaque pas la primitive cryptographique, on attaque son
+implémentation**. Les 128 bits de sécurité se réduisent à l'exécution à une branche :
+
+```
+digest = MD5(nonce ‖ K)
+memcmp(digest, response+0x14, 16)
+cbnz w0, "auth failed !"        ; un bit de décision
+```
+
+Trois propriétés rendent cette cible plus favorable que la moyenne en fault injection :
+
+1. **Déterminisme total** — pas d'ASLR, monothread, même séquence d'allocations à chaque
+   boot : le timing est reproductible.
+2. **Trigger réseau propre** — c'est *toi* qui envoies la réponse UDP, et le `memcmp`
+   s'exécute quelques µs plus tard, à délai fixe. Pas besoin de deviner un instant dans
+   le boot : on se synchronise sur son propre paquet.
+3. **Réessais illimités** — une seule chance d'auth par boot (les 4 retries de
+   `0x9fa0ddf8` ne couvrent que le `ETIMEDOUT`, pas l'échec de comparaison), mais rien
+   n'empêche de rebooter en boucle.
+
 ## Pistes explorées et écartées (ne pas refaire)
 
 | Piste | Verdict |
