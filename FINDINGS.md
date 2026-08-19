@@ -539,6 +539,75 @@ avant la fin du processus de divulgation.
 - **Verdict (2 passages, ~5000 cas avec détecteur durci)** : **0 crash réel**, Player intact (ping/ports OK). Le parser RAOP **résiste au fuzzing black-box dumb**. `%n` géré, bornes OK.
 - **Conclusion piste AirPlay/RAOP** : surface réelle et non authentifiée, mais **robuste** au fuzzing sans instrumentation. Pour aller plus loin il faudrait : mutations **grammar-aware** (SDP/plist binaires structurés), le **port 7000 (plists AirPlay)** non encore fuzzé, ou le **binaire du daemon** (dans le rootfs chiffré → hors d'atteinte). Coût élevé, ROI incertain. **Pas le quick win espéré.**
 
+## 🔘 `bank0` — un système de secours v1.2, forçable par le BOUTON RESET (2026-08-19)
+
+### Le GPIO `force_bank0` est le bouton Factory Reset
+
+Dans `apq8098-freebox-batfish.dts` (sources GPL) :
+
+```dts
+force_bank0: force_bank0 {
+        mux    { pins = "gpio18"; function = "gpio"; };
+        config { pins = "gpio18"; drive-strength = <2>; bias-disable; };
+};
+
+gpio_keys {
+        pinctrl-0 = <&force_bank0>;
+        button@1 {
+                label       = "Factory Reset Button";
+                linux,code  = <KEY_SETUP>;
+                gpios       = <&tlmm 18 GPIO_ACTIVE_LOW>;
+        };
+};
+```
+
+**TLMM 18 = `force_bank0` = le bouton Factory Reset.** `GPIO_ACTIVE_LOW`,
+`bias-disable` (pull externe sur la carte) : maintenu enfoncé au démarrage, il tire la
+ligne à la masse et force le boot sur `bank0`.
+
+> 🎯 **Conséquence : `bank0` est atteignable SANS ouvrir le boîtier ni souder.**
+> C'est la différence majeure avec le GPIO 29 (test mode), qui n'a aucun bouton associé
+> et impose un accès au PCB.
+
+⚠️ Le même bouton sert au reset usine côté Linux (`KEY_SETUP`) — la distinction se fait
+sur le moment : maintien **au boot** = `force_bank0` (lu avant Linux) ; appui **en
+fonctionnement** = reset usine. Le reset usine a déjà été testé sur ce Player (aucune
+nouvelle surface), donc pas de perte supplémentaire à craindre.
+
+### Contenu de `bank0` — un système complet, pas un simple bootloader
+
+`boot0_42.20+bank0_1.2` contient un **imagetag complet à l'offset `0x800000`** :
+
+| Partition | Offset | Taille | type | flags |
+|-|-|-|-|-|
+| `kernel` | `0x00001000` | 3 603 028 | 0 | `0x5` signé + compressé |
+| `qcom-dtbs` | `0x00371000` | 56 500 | 3 | `0x5` signé + compressé |
+| `rootfs` | `0x0037f000` | 16 764 928 | 1 | `0x1` signé |
+
+Total 20,4 Mo, **version 1.2** — contre 1.5.24.2 pour `bank1`, soit ~7 ans d'écart de
+correctifs. Le rootfs de 16,7 Mo (vs 131 Mo en `bank1`) indique un **système réduit**,
+vraisemblablement recovery/usine.
+
+### Chiffré comme `bank1` — pas de reverse offline
+
+`kernel` et `qcom-dtbs` sont en conteneur **`SKRY`**, `rootfs` en chiffré brut
+(entropie 7.9998). Le contenu de `bank0` n'est donc **pas analysable hors ligne** ;
+il faudra le sonder en boîte noire une fois booté (même méthodologie que pour `bank1`).
+
+Détail de format : l'en-tête `SKRY` de `bank0` fait **`0x154`** contre **`0x258`** en
+`bank1`. L'écart (`0x104`) correspond exactement au sous-magic `SK31` + la signature
+RSA-2048 — le format a donc **gagné une signature** entre la v1.2 et la v1.5.
+
+### Ce que `bank0` n'apporte PAS
+
+`boot_from_tag` n'a que **deux appelants** (`0x9fa0a40c` avec `mode=1`, `0x9fa0acd0`
+avec `mode=0`). Booter sur `bank0` passe par le chemin flash normal, donc **`mode=1` :
+la signature reste exigée**. `force_bank0` ne contourne aucune vérification — il change
+le *système exécuté*, pas la politique de confiance.
+
+Son intérêt est ailleurs : faire tourner un firmware de ~2019 dont les vulnérabilités
+connues n'ont jamais été corrigées, et dont la surface réseau diffère de `bank1`.
+
 ## 🌐 Écosystème & état de l'art (2026-08-19)
 
 ### Le fbx7hd reste vierge
