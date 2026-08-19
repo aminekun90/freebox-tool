@@ -279,9 +279,14 @@ Il ne demande que `K`. (Une seconde voie, non publiée, retire cette exigence.)
       niveau **haut** (1,8 V, ~1 kΩ) au reset — non destructif et réversible.
       ⚠️ Faire l'UART **d'abord** : sans console série on ne peut pas savoir si le
       mode test a été atteint (`## Booting in test mode.`).
-- [ ] Compiler un kernel + DTB depuis le patch GPL (`linux-4.4.302-fbx`,
-      `apq8098-freebox-batfish.dts`) et l'emballer avec `scripts/mkimagetag.py`.
+- [ ] Compiler un kernel + DTB et l'emballer avec `scripts/mkimagetag.py`.
+      **Viser mainline** (MSM8998 supporté depuis 6.0, ports postmarketOS existants sur
+      le même SoC) plutôt que le `linux-4.4.302-fbx` de Free, qui est EOL et dont on n'a
+      que la 1.5.3. Porter `apq8098-freebox-batfish.dts` par-dessus.
       Le DTB doit porter le bon `compatible`, sinon `No DTB could boot kernel: tried:`.
+      Premier objectif : **console UART + réseau**, rien d'autre.
+- [ ] Surveiller la version du **bootchain** (42.20), pas celle du système : c'est elle
+      qui porte `snapl`.
 - [x] ~~Auditer statiquement la surface réseau pré-auth de `snapl`~~ → 🔒 fait,
       résultat **non publié** (divulgation en cours, cf. [`FINDINGS.md`](./FINDINGS.md)).
 - [ ] Confirmer le layout exact des flags de partition (bit 0 = signé) en croisant

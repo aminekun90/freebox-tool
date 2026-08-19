@@ -539,6 +539,63 @@ avant la fin du processus de divulgation.
 - **Verdict (2 passages, ~5000 cas avec détecteur durci)** : **0 crash réel**, Player intact (ping/ports OK). Le parser RAOP **résiste au fuzzing black-box dumb**. `%n` géré, bornes OK.
 - **Conclusion piste AirPlay/RAOP** : surface réelle et non authentifiée, mais **robuste** au fuzzing sans instrumentation. Pour aller plus loin il faudrait : mutations **grammar-aware** (SDP/plist binaires structurés), le **port 7000 (plists AirPlay)** non encore fuzzé, ou le **binaire du daemon** (dans le rootfs chiffré → hors d'atteinte). Coût élevé, ROI incertain. **Pas le quick win espéré.**
 
+## 🌐 Écosystème & état de l'art (2026-08-19)
+
+### Le fbx7hd reste vierge
+
+Aucun projet public n'a de root sur le Player Delta. Les deux travaux récents sur
+l'écosystème Freebox ne sont **pas transposables** :
+
+| Travail | Cible | Transposable ? |
+|-|-|-|
+| [39C3 — *Set-top box Hacking: freeing the 'Freebox'*](https://media.ccc.de/v/39c3-set-top-box-hacking-freeing-the-freebox) (déc. 2025) | **Freebox HD v5** (2006) — chaîne de 2 0-days dont un kernel | ❌ architecture sans rapport avec un Snapdragon 835. Utile surtout pour sa cartographie du **réseau privé de l'opérateur** (cf. VLAN 41) |
+| [Re-OpenFreebox / revolution-v6](https://github.com/Re-OpenFreebox/revolution-v6) | **Freebox Revolution v6** — root + déchiffrement firmware | ❌ SoC et chaîne de boot différents |
+
+### Free ne documente plus les Players
+
+Le flux officiel [`dev.freebox.fr`](https://dev.freebox.fr/blog/?feed=rss2) reste actif
+**pour le Server** (4.12.3, 23 juil. 2026) mais **s'arrête à la 1.5.21 du 21 oct. 2025**
+pour le Player Devialet/One. Les versions **1.5.24 et 1.5.25 sont déployées sans aucun
+changelog officiel**. Cohérent avec la migration de branches de code annoncée
+(unification Devialet ↔ Révolution + migration d'infra vers FreeTV).
+
+Le programme bêta ([FS#40872](https://dev.freebox.fr/bugs/task/40872)) est **fermé aux
+Player Devialet** (encore ouvert aux Révolution) → pas d'accès légitime à un canal
+`mode=beta`.
+
+### Sources GPL gelées — 2 ans de retard
+
+[`floss.freebox.fr/freebox_player_delta/`](https://floss.freebox.fr/freebox_player_delta/)
+publie au mieux la **1.5.3, datée du 19 avril 2024**, alors que le firmware déployé est
+en 1.5.25. Notre `linux-4.4.302-fbx.patch` et le DTS `apq8098-freebox-batfish.dts`
+correspondent donc à 1.5.3.
+
+**Ce n'est pas bloquant** : le DTS décrit le **PCB**, et le PCB n'a pas changé. Les
+sources 1.5.3 restent valides pour comprendre le matériel.
+
+### ⚠️ Le bootchain est versionné séparément du système
+
+Distinction importante pour évaluer l'impact d'une mise à jour :
+
+| Composant | Version |
+|-|-|
+| `boot0+bank0`, `boot1` (**contient `snapl`**) | **42.20** |
+| `bank1` (kernel + dtbs + rootfs) | 1.5.24.2 |
+
+Une mise à jour **système** (1.5.24 → 1.5.25) **ne touche pas forcément `snapl`**.
+C'est la version du **bootchain** (42.x) qu'il faut surveiller, pas celle du système.
+
+### Stratégie kernel : mainline, pas le 4.4 de Free
+
+Le MSM8998/APQ8098 est **supporté en mainline** (kernel 6.0+), avec des ports
+postmarketOS actifs sur des appareils au même SoC (OnePlus 5/5T `cheeseburger`,
+Xiaomi Mi 6). Partir du **4.4.302-fbx de Free est un mauvais choix** : EOL, criblé de
+CVE, et on n'a de toute façon que la 1.5.3.
+
+**Voie retenue** : kernel **mainline récent** + portage du DTS `apq8098-freebox-batfish`
++ userland custom (Alpine / busybox). Pour un premier boot on ne vise que **console UART
++ réseau** — l'audio Devialet et le HDMI viennent après.
+
 ## Annexes
 
 - [homebridge-freebox-player-delta](https://github.com/securechicken/homebridge-freebox-player-delta) — contrôle local (télécommande réseau).
