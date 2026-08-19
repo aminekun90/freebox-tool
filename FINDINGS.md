@@ -598,6 +598,42 @@ Détail de format : l'en-tête `SKRY` de `bank0` fait **`0x154`** contre **`0x25
 `bank1`. L'écart (`0x104`) correspond exactement au sous-magic `SK31` + la signature
 RSA-2048 — le format a donc **gagné une signature** entre la v1.2 et la v1.5.
 
+### ✅ Sûreté : `snapl` n'écrit rien au boot (vérifié statiquement)
+
+Question critique avant de tenter quoi que ce soit : **est-ce que démarrer peut coûter
+cher ?** Réponse côté bootloader : **non**.
+
+`boot_lun_switch` (`0x9fa02490`) est le **seul chemin d'écriture flash de `snapl`**, et
+il n'a **qu'un seul appelant** (`0x9fa0a490`), gardé ainsi :
+
+```
+boot_failed(reason):
+        cmp  w19, #1
+        b.eq 0x9fa0a470          ; uniquement si reason == 1
+0x9fa0a470:
+        ldr  w0, [0x9fa0001c]    ; numero de bank
+        cmp  w0, #1
+        b.ne 0x9fa0a448          ; si bank != 1 -> AUCUNE ecriture
+        ldr  w0, [0x9fa00018]    ; boot LUN
+        bl   boot_lun_switch     ; bascule 1<->2 et ECRIT
+```
+
+1. **Un boot qui réussit n'écrit rien** — ce code n'est atteint que depuis le
+   gestionnaire d'échec de boot.
+2. **Forcer `bank0` ne peut pas déclencher l'écriture** : elle exige `bank == 1`, donc
+   la condition est fausse en `bank0`, même si le boot échoue.
+3. Le switch n'est qu'un repli A/B entre les deux LUN UFS.
+
+**Limite de cette garantie** : elle ne couvre que `snapl`. Le rootfs de `bank0` étant
+chiffré, on ne sait pas ce que fait son Linux une fois démarré — et un recovery a par
+vocation la capacité de re-flasher. Mitigation : **un recovery ne peut re-flasher que
+s'il a une source de firmware**. Débrancher physiquement l'Ethernet élimine d'un coup
+le re-flash, la MAJ système et la MAJ du bootchain.
+
+**Protocole recommandé** : (1) câble réseau **débranché**, (2) bouton reset maintenu au
+démarrage, observer LED/HDMI, (3) rebrancher seulement sur un segment **sans route vers
+Internet** pour le scan.
+
 ### Ce que `bank0` n'apporte PAS
 
 `boot_from_tag` n'a que **deux appelants** (`0x9fa0a40c` avec `mode=1`, `0x9fa0acd0`

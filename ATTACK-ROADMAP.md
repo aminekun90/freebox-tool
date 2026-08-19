@@ -130,7 +130,7 @@ Avantage bonus : le Mac voyant **tout** le trafic en clair au niveau IP, on peut
 - [x] ~~Trouver la sélection du mode test~~ → **GPIO 29** lu en entrée @ `0x9fa00680`.
 - [x] ~~Auditer la pile réseau~~ → 🔒 résultat non publié (divulgation en cours, cf. `FINDINGS.md`).
 - [x] ~~Reverser l'allocateur~~ → dlmalloc (confirmé par signatures : seuil `0xe8`,
-      `MIN_CHUNK_SIZE` 32, contrôle `unlink` avec panic `malloc abort`).
+      `MIN_CHUNK_SIZE` 32, contrôle d'intégrité `unlink` → message `malloc abort`).
 - [x] ~~Déterminer si le tas est exécutable~~ → `snapl` tourne en **EL1** (seuls des
       registres `_EL1` sont écrits : `MAIR`/`TCR`/`TTBR0`/`SCTLR`/`VBAR`), et **PXN est
       absent** de tous les descripteurs de bloc → **tas exécutable en EL1**.
